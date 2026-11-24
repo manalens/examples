@@ -16,7 +16,8 @@ dependencies. Copy the folder that is nearest to your stack.
 | [with-unity](./with-unity) | Unity SDK | Publishable key | A Unity project with `PublishableKey`, level events, `TrackError()`, `Identify()`, `LinkUrl()` |
 | [with-unreal](./with-unreal) | Unreal plugin | Publishable key | An Unreal Engine 5 C++ project with the plugin: `SetConsent()`, `Identify()`, level events with `Track()`, `TrackError()`, and one Blueprint path |
 | [with-express-server](./with-express-server) | Node SDK (server mode) | Secret key | The player's IP and user agent as context, a purchase webhook route |
-| [with-stripe-paddle](./with-stripe-paddle) | Web SDK (script tag) | Publishable key | One player ID in `identify()`, the Stripe Checkout Session metadata and the Paddle custom data, so webhook revenue joins the player |
+| [with-stripe](./with-stripe) | Web SDK (script tag) | Publishable key | One player ID in `identify()` and in the Stripe Checkout Session metadata (set on the server), so Stripe webhook revenue joins the player |
+| [with-paddle](./with-paddle) | Web SDK (script tag) | Publishable key | One player ID in `identify()` and in the Paddle.js `customData`, so Paddle webhook revenue joins the player |
 
 ## Keys
 
@@ -37,7 +38,7 @@ Every example needs the collector URL (the endpoint), without `/v0/events`:
 - **Hosted:** your collector URL from the project's install page.
 
 Web events (`with-next`, `with-html`, `with-astro`, `with-react`,
-`with-threejs`, `with-stripe-paddle` and the Electron renderer) must come from a page on the **project domain** or one of
+`with-threejs`, `with-stripe`, `with-paddle` and the Electron renderer) must come from a page on the **project domain** or one of
 its subdomains. For a local test, use a project with the domain `localhost`
 or `<name>.localhost` and open the page on that host. Chromium sends every
 `*.localhost` name to your machine.
@@ -106,7 +107,8 @@ pnpm smoke
 | `threejs` | The game with `?demo=1` in headless Chromium: game, session, level and error events |
 | `next` | `next dev` in headless Chromium: page views on navigation, `trial_started`, `identify` |
 | `react` | `vite dev` in headless Chromium: one page event per React Router navigation (also with `StrictMode`), `wishlist_clicked`, `identify` |
-| `stripe-paddle` | The store page in headless Chromium, without payment keys: `identify` has the player ID that the server puts in the checkout |
+| `stripe` | The Stripe store page in headless Chromium, without payment keys: `identify` has the player ID that the server puts in the Checkout Session |
+| `paddle` | The Paddle store page in headless Chromium, without payment keys: `identify` has the player ID that the page puts in `customData` |
 | `astro` | The built Astro site in headless Chromium: `wishlist_clicked`, `identify`, and View Transitions navigation (links and back). It fails unless the page events sent equal the pages visited, path and title (also after back) |
 
 Set `MANALENS_SMOKE_ONLY=express,godot` to run some checks only. The Electron

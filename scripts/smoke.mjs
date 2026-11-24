@@ -34,9 +34,10 @@
 //   next           with-next: next dev in headless Chromium
 //   react          with-react: vite dev in headless Chromium; one page event
 //                  per React Router navigation, wishlist_clicked, identify
-//   stripe-paddle  with-stripe-paddle: the store page in headless Chromium;
-//                  identify() has the player ID that the server puts in the
-//                  Stripe metadata and the Paddle custom data
+//   stripe         with-stripe: the store page in headless Chromium; identify()
+//                  has the player ID that the server puts in the Checkout Session
+//   paddle         with-paddle: the store page in headless Chromium; identify()
+//                  has the player ID that the page puts in customData
 //   astro          with-astro: the built site in headless Chromium, with
 //                  View Transitions; one page event per page visited, with
 //                  the path and title of that page (also after back)
@@ -403,12 +404,12 @@ await check('react', async () => {
   }
 });
 
-await check('stripe-paddle', async () => {
-  needInstall('with-stripe-paddle');
-  const port = 18090;
-  // No Stripe or Paddle keys: the check needs no payment account and buys nothing.
-  const env = { ...process.env, PORT: String(port), MANALENS_ENDPOINT: endpoint, MANALENS_PUBLISHABLE_KEY: publishableKey, STRIPE_SECRET_KEY: '', PADDLE_CLIENT_TOKEN: '' };
-  const { child, log } = start('node', ['src/server.mjs'], { cwd: join(root, 'with-stripe-paddle'), env });
+/** A store page (with-stripe or with-paddle) without payment keys: identify() has the server's player ID. */
+async function storeCheck(dir, port, extraEnv) {
+  needInstall(dir);
+  // No payment keys: the check needs no payment account and buys nothing.
+  const env = { ...process.env, PORT: String(port), MANALENS_ENDPOINT: endpoint, MANALENS_PUBLISHABLE_KEY: publishableKey, ...extraEnv };
+  const { child, log } = start('node', ['src/server.mjs'], { cwd: join(root, dir), env });
   try {
     await waitForHttp(`http://127.0.0.1:${port}/`, 10_000, log);
     const { page, statuses, consoleErrors } = await newPage();
@@ -421,7 +422,7 @@ await check('stripe-paddle', async () => {
     const playerId = await page.evaluate(() => document.body.dataset.playerId);
     await waitForRequests(statuses, 1, 15_000);
     await sleep(500);
-    const stripe = await page.evaluate(() => fetch('/api/stripe/checkout', { method: 'POST' }).then(response => response.status));
+    const stripe = dir === 'with-stripe' ? await page.evaluate(() => fetch('/api/stripe/checkout', { method: 'POST' }).then(response => response.status)) : 501;
     await page.close();
     if (!/^player_[a-f0-9]{12}$/.test(playerId ?? '')) throw new Error(`no player ID in the page: ${playerId}`);
     if (!identified.includes(playerId)) throw new Error(`no identify with ${playerId} (sent: ${identified.join(', ') || 'none'})`);
@@ -430,7 +431,10 @@ await check('stripe-paddle', async () => {
   } finally {
     stop(child);
   }
-});
+}
+
+await check('stripe', () => storeCheck('with-stripe', 18090, { STRIPE_SECRET_KEY: '' }));
+await check('paddle', () => storeCheck('with-paddle', 18091, { PADDLE_CLIENT_TOKEN: '' }));
 
 await check('astro', async () => {
   needInstall('with-astro');
