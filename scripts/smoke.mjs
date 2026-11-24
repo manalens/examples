@@ -16,8 +16,9 @@
 //   GODOT                     the Godot 4 binary (default: godot on PATH)
 //   UNITY                     the Unity Editor binary, 2021.3 or newer (the
 //                             unity check is skipped without it)
-//   UNREAL_GAME               a packaged with-unreal game binary (the unreal
-//                             check is skipped without it)
+//   UNREAL_GAME               a packaged with-unreal game binary, or
+//   UNREAL_EDITOR             UnrealEditor-Cmd, to run the built project with
+//                             -game (the unreal check is skipped without both)
 //
 // Checks:
 //   express        with-express-server: the app with a server-mode client
@@ -26,10 +27,8 @@
 //   godot          with-godot: the headless demo (skipped without Godot)
 //   unity          with-unity: builds a desktop player, runs it in batch mode
 //                  with --demo (skipped without UNITY)
-//   unreal-http    with-unreal: request.example.json (the body that the C++
-//                  subsystem sends) with new IDs and times
-//   unreal         with-unreal: a packaged build with -ManalensDemo (skipped
-//                  without UNREAL_GAME)
+//   unreal         with-unreal: the game with the Manalens plugin and
+//                  -ManalensDemo (skipped without UNREAL_GAME or UNREAL_EDITOR)
 //   html           with-html: the snippet page in headless Chromium
 //   threejs        with-threejs: the game's ?demo=1 run in headless Chromium
 //   next           with-next: next dev in headless Chromium
@@ -228,35 +227,23 @@ await check('unity', async () => {
   return `${demo.events_sent} events in ${demo.sends_ok} request(s), all 2xx, queue empty`;
 });
 
-await check('unreal-http', async () => {
-  // The same body as UAnalyticsSubsystem::Flush(), with new IDs and times, so
-  // the collector accepts it again (each message_id counts once, and an event
-  // can be at most 7 days old).
-  const { readFileSync } = await import('node:fs');
-  const body = JSON.parse(readFileSync(join(root, 'with-unreal/request.example.json'), 'utf8'));
-  const anonymousId = randomUUID();
-  const sessionId = randomUUID();
-  const now = Date.now();
-  body.events.forEach((event, index) => {
-    Object.assign(event, { message_id: randomUUID(), anonymous_id: anonymousId, session_id: sessionId, original_timestamp: new Date(now + index).toISOString() });
-    if (event.event === 'game_open') event.properties.first_open_at = new Date(now).toISOString();
-    if (event.type === 'identify') event.user_id = `${runId}-unreal`;
-  });
-  const response = await fetch(eventsUrl, { method: 'POST', headers: { 'content-type': 'application/json', 'x-publishable-key': publishableKey }, body: JSON.stringify(body) });
-  const text = await response.text();
-  if (response.status !== 202) throw new Error(`${response.status} ${text.slice(0, 500)}`);
-  return `${body.events.length} events: 202 ${text}`;
-});
-
 await check('unreal', async () => {
+  // A packaged build (UNREAL_GAME), or the built project with UnrealEditor-Cmd -game (UNREAL_EDITOR).
   const game = process.env.UNREAL_GAME;
-  if (!game || !existsSync(game)) throw new Skip('set UNREAL_GAME to a packaged with-unreal game binary (see with-unreal/README.md)');
-  const run = spawnSync(game, ['-ManalensDemo', `-ManalensEndpoint=${endpoint}`, `-ManalensKey=${publishableKey}`, '-nullrhi', '-unattended', '-stdout', '-FullStdOutLogOutput'], { encoding: 'utf8', timeout: 120_000, maxBuffer: 64 * 1024 * 1024 });
+  const editor = process.env.UNREAL_EDITOR;
+  if (!(game && existsSync(game)) && !(editor && existsSync(editor))) throw new Skip('set UNREAL_GAME to a packaged with-unreal game binary, or UNREAL_EDITOR to UnrealEditor-Cmd (see with-unreal/README.md)');
+  const settings = '[/Script/Manalens.ManalensSettings]';
+  const args = ['-ManalensDemo', `-ini:Game:${settings}:Endpoint=${endpoint},${settings}:PublishableKey=${publishableKey}`, '-nullrhi', '-nosound', '-unattended', '-stdout', '-FullStdOutLogOutput'];
+  const run = game && existsSync(game)
+    ? spawnSync(game, args, { encoding: 'utf8', timeout: 120_000, maxBuffer: 64 * 1024 * 1024 })
+    : spawnSync(editor, [join(root, 'with-unreal/ManalensExample.uproject'), '-game', ...args], { encoding: 'utf8', timeout: 300_000, maxBuffer: 64 * 1024 * 1024 });
   const output = `${run.stdout}${run.stderr}`;
-  const sends = [...output.matchAll(/MANALENS_SEND status=(\d+) events=(\d+)/g)].map(match => ({ status: Number(match[1]), events: Number(match[2]) }));
-  if (!output.includes('MANALENS_DEMO done')) throw new Error(`no MANALENS_DEMO line (exit ${run.status})\n${output.slice(-1500)}`);
-  const detail = assertAll2xx(sends.map(send => send.status));
-  return `${sends.reduce((sum, send) => sum + send.events, 0)} events: ${detail}`;
+  if (!output.includes('MANALENS_DEMO done')) throw new Error(`no MANALENS_DEMO line (exit ${run.status})\n${output.replaceAll(publishableKey, 'mana_pk_***').slice(-1500)}`);
+  const sends = [...output.matchAll(/MANALENS_SEND ok=(true|false) events=(\d+)/g)].map(match => ({ ok: match[1] === 'true', events: Number(match[2]) }));
+  const dropped = [...output.matchAll(/MANALENS_DROPPED status=(\d+) events=(\d+)/g)].map(match => match[0]);
+  if (sends.length === 0) throw new Error('no request reached the collector');
+  if (dropped.length || sends.some(send => !send.ok)) throw new Error(`failed sends: ${dropped.join(', ')} ${sends.filter(send => !send.ok).length} not ok`);
+  return `${sends.reduce((sum, send) => sum + send.events, 0)} events in ${sends.length} request(s), all 2xx`;
 });
 
 // Browser checks --------------------------------------------------------------

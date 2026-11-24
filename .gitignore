@@ -20,6 +20,8 @@ with-unreal/Intermediate/
 with-unreal/Saved/
 with-unreal/DerivedDataCache/
 with-unreal/*.sln
+# The plugin: with-unreal/get-plugin.sh downloads it
+with-unreal/Plugins/
 
 # Electron
 release/
