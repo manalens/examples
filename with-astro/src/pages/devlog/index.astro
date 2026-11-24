@@ -1,0 +1,11 @@
+---
+import Base from '../../layouts/Base.astro';
+import { posts } from '../../data/posts';
+---
+<Base title="Devlog" viewTransitions>
+  <h1>Devlog</h1>
+  <p class="note">The devlog pages use View Transitions (<code>&lt;ClientRouter /&gt;</code>). A link between them does not load a full page, so the site sends the page view on <code>astro:page-load</code>.</p>
+  <ul>
+    {posts.map(post => <li><a href={`/devlog/${post.slug}/`}>{post.title}</a> <span class="note">{post.date}</span></li>)}
+  </ul>
+</Base>

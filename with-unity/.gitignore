@@ -1,0 +1,17 @@
+# Unity makes these. Keep Assets, Packages/manifest.json and ProjectSettings.
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Ll]ogs/
+/[Bb]uild/
+/[Bb]uilds/
+/[Uu]ser[Ss]ettings/
+/MemoryCaptures/
+/Packages/packages-lock.json
+# The empty scene that BuildDemo.Build() makes
+/Assets/Scenes/
+/Assets/Scenes.meta
+# IDE files
+*.csproj
+*.sln
+*.slnx

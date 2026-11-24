@@ -1,0 +1,13 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "5.7",
+	"Category": "",
+	"Description": "Manalens example: game events from C++ over HTTP",
+	"Modules": [
+		{
+			"Name": "ManalensExample",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}

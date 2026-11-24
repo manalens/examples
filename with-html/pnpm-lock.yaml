@@ -1,0 +1,23 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@manalens/web':
+        specifier: file:../vendor/manalens-web-0.1.0.tgz
+        version: file:../vendor/manalens-web-0.1.0.tgz
+
+packages:
+
+  '@manalens/web@file:../vendor/manalens-web-0.1.0.tgz':
+    resolution: {integrity: sha512-lUHAKuT7b/0rl6U8eTGTFR9GxES5e3U2yIpuCPjRp0oQ5hSd3ItwF8gCMS85+TvjJ9fGJftiE85JfuzaMqF20g==, tarball: file:../vendor/manalens-web-0.1.0.tgz}
+    version: 0.1.0
+
+snapshots:
+
+  '@manalens/web@file:../vendor/manalens-web-0.1.0.tgz': {}

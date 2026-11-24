@@ -1,0 +1,89 @@
+name: Build examples
+
+# Builds, type-checks and checks each example. No secrets, and no request to
+# a collector: the examples build without keys, and the smoke test
+# (scripts/smoke.mjs) is not run here.
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  npm:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: with-next, run: build }
+          - { name: with-html, run: check }
+          - { name: with-astro, run: build }
+          - { name: with-threejs, run: build }
+          - { name: with-react, run: build }
+          - { name: with-electron, run: typecheck }
+          - { name: with-express-server, run: typecheck }
+          - { name: with-stripe-paddle, run: typecheck }
+    name: ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 11
+
+      - name: Install
+        working-directory: ${{ matrix.name }}
+        env:
+          # The type check needs Electron's types, not its binary.
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+        run: pnpm install --frozen-lockfile
+
+      - name: Build or check
+        working-directory: ${{ matrix.name }}
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          ASTRO_TELEMETRY_DISABLED: "1"
+          RUN: ${{ matrix.run }}
+        run: pnpm run "$RUN"
+
+  godot:
+    runs-on: ubuntu-latest
+    name: with-godot
+    env:
+      GODOT_VERSION: 4.7.2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download Godot
+        run: |
+          curl -fsSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot
+
+      - name: Import and load the project
+        # Without a key the example sends nothing. The step fails on a
+        # script that does not load.
+        run: |
+          ./godot --headless --path with-godot --import 2>&1 | tee import.log
+          ./godot --headless --path with-godot --quit-after 5 2>&1 | tee run.log
+          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|Failed to instantiate" import.log run.log; then
+            exit 1
+          fi
