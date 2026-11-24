@@ -12,7 +12,8 @@ export const examples = [
   { dir: 'with-react', check: ['build'] },
   { dir: 'with-electron', check: ['typecheck'] },
   { dir: 'with-express-server', check: ['typecheck'] },
-  { dir: 'with-stripe-paddle', check: ['typecheck'] },
+  { dir: 'with-stripe', check: ['typecheck'] },
+  { dir: 'with-paddle', check: ['typecheck'] },
 ];
 
 const step = process.argv[2];

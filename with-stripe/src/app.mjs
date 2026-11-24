@@ -1,14 +1,13 @@
 // @ts-check
-// A game store page that sells a soundtrack with Stripe Checkout or Paddle
-// Billing, and links each payment to the player in Manalens.
+// A game store page that sells a soundtrack with Stripe Checkout, and links
+// each payment to the player in Manalens.
 //
 // The rule: use ONE opaque player ID everywhere.
 //   - The page calls manalens.identify(playerId) with the web SDK.
-//   - Stripe: the server creates the Checkout Session with
+//   - The server creates the Checkout Session with
 //     metadata.user_id = playerId (and client_reference_id).
-//   - Paddle: Paddle.Checkout.open() gets customData.user_id = playerId.
-// Manalens reads the payment from the Stripe or Paddle webhook that you
-// connect in Settings > Integrations, and joins it to the player by that ID.
+// Manalens reads the payment from the Stripe webhook that you connect in
+// Settings > Integrations, and joins it to the player by that ID.
 // This app sends no revenue event itself.
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -28,8 +27,6 @@ const escapeAttr = (/** @type {string} */ value) => value.replace(/[&"<>]/g, c =
  * @param {string} config.cookieSecret Signs the player cookie.
  * @param {import('stripe').Stripe} [config.stripe] A Stripe client, or undefined to turn Stripe off.
  * @param {string} [config.stripePriceId]
- * @param {string} [config.paddleClientToken] Public: Paddle.js needs it in the page.
- * @param {string} [config.paddlePriceId]
  */
 export function createApp(config) {
   const app = express();
@@ -58,8 +55,6 @@ export function createApp(config) {
       MANALENS_ENDPOINT: config.endpoint,
       PLAYER_ID: res.locals.playerId,
       STRIPE_ENABLED: config.stripe && config.stripePriceId ? 'true' : 'false',
-      PADDLE_CLIENT_TOKEN: config.paddleClientToken ?? '',
-      PADDLE_PRICE_ID: config.paddlePriceId ?? '',
     };
     let html = page;
     for (const [name, value] of Object.entries(values)) html = html.replaceAll(`%${name}%`, escapeAttr(value));
