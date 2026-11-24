@@ -14,7 +14,7 @@ dependencies. Copy the folder that is nearest to your stack.
 | [with-electron](./with-electron) | Web SDK + Node SDK (app mode) | Publishable key | Renderer and main process with one anonymous ID, `app_unclean_exit` with a running flag |
 | [with-godot](./with-godot) | Godot SDK | Publishable key | A Godot 4 project with `publishable_key`, level events, `track_error()`, `link_url()` |
 | [with-unity](./with-unity) | Unity SDK | Publishable key | A Unity project with `PublishableKey`, level events, `TrackError()`, `Identify()`, `LinkUrl()` |
-| [with-unreal](./with-unreal) | HTTP (no SDK) | Publishable key | An Unreal Engine 5 C++ game instance subsystem: anonymous ID, sessions, `game_open`, level events, errors, `identify`, batches and retries |
+| [with-unreal](./with-unreal) | Unreal plugin | Publishable key | An Unreal Engine 5 C++ project with the plugin: `SetConsent()`, `Identify()`, level events with `Track()`, `TrackError()`, and one Blueprint path |
 | [with-express-server](./with-express-server) | Node SDK (server mode) | Secret key | The player's IP and user agent as context, a purchase webhook route |
 | [with-stripe-paddle](./with-stripe-paddle) | Web SDK (script tag) | Publishable key | One player ID in `identify()`, the Stripe Checkout Session metadata and the Paddle custom data, so webhook revenue joins the player |
 
@@ -56,6 +56,8 @@ The packages are not on npm yet. Until they are:
   [vendor/](./vendor). `with-unity/Packages/manifest.json` installs it with a
   `file:` path.
 - The Godot example has a copy of the addon in `with-godot/addons/`.
+- The Unreal plugin is not in this repository. `with-unreal/get-plugin.sh`
+  downloads release `v0.1.0` into `with-unreal/Plugins/Manalens`.
 
 To use an SDK in your own project now, install it from its public GitHub
 repository (MIT):
@@ -71,6 +73,8 @@ repository (MIT):
 - Unity: [manalens-unity](https://github.com/manalens/manalens-unity). In the
   Package Manager, add the git URL
   `https://github.com/manalens/manalens-unity.git#v0.1.0`.
+- Unreal: [manalens-unreal](https://github.com/manalens/manalens-unreal).
+  Copy the `Manalens` folder into `Plugins/`.
 - The Node SDK is not public yet: copy the tarball from [vendor/](./vendor).
 
 TODO: when the packages are on npm, change each `file:` dependency to
@@ -97,8 +101,7 @@ pnpm smoke
 | `electron-main` | The Electron main-process module in Node.js: `app_unclean_exit`, `app_started`, `app_quit` |
 | `godot` | The Godot project headless (`-- --demo`). Skipped without Godot; set `GODOT` to the binary |
 | `unity` | Builds a desktop player of the Unity project, then runs it in batch mode (`--demo`). Skipped without Unity; set `UNITY` to the Editor binary |
-| `unreal-http` | Sends `with-unreal/request.example.json` (the body that the C++ subsystem sends) with new IDs and times. Needs no Unreal |
-| `unreal` | Runs a packaged build of the Unreal project with `-ManalensDemo`. Skipped without it; set `UNREAL_GAME` to the game binary |
+| `unreal` | Runs the Unreal project with the plugin and `-ManalensDemo`. Skipped without Unreal; set `UNREAL_EDITOR` to `UnrealEditor-Cmd` (the project must be built) or `UNREAL_GAME` to a packaged game |
 | `html` | The snippet page in headless Chromium: two page views and `signup_clicked` |
 | `threejs` | The game with `?demo=1` in headless Chromium: game, session, level and error events |
 | `next` | `next dev` in headless Chromium: page views on navigation, `trial_started`, `identify` |

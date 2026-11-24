@@ -6,7 +6,7 @@ public class ManalensExample : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine" });
-		// The analytics subsystem sends events with the HTTP module and builds the body with Json.
-		PrivateDependencyModuleNames.AddRange(new string[] { "HTTP", "Json" });
+		// The Manalens plugin (Plugins/Manalens). Add it to your own module's Build.cs.
+		PrivateDependencyModuleNames.Add("Manalens");
 	}
 }

@@ -1,51 +1,20 @@
 # with-unreal
 
-An Unreal Engine 5 C++ project that sends game events to Manalens over HTTP.
+A small Unreal Engine 5 C++ project with the Manalens **Unreal plugin**.
 
-Manalens has **no Unreal SDK or plugin**. This project has a game instance
-subsystem, `UAnalyticsSubsystem`, that does what an SDK would do. Copy
-`Source/ManalensExample/AnalyticsSubsystem.h` and `.cpp` into your own game
-module. The website guide
-[How to add analytics to an Unreal Engine game](https://manalens.dev/blog/unreal-engine-analytics)
-explains each part.
-
-## What it shows
-
-| Event | Properties | When |
-| --- | --- | --- |
-| `game_open` | `is_first_open`, `first_open_at` | Each launch |
-| `session_start` | none | Launch, or the first event after 30 minutes idle |
-| `session_end` | `duration_s` | 30 minutes idle, a session 24 hours old, or quit |
-| `level_start` | `level`, `attempt` | `LevelStart()` |
-| `level_complete`, `level_fail` | `level`, `attempt`, `score` | `LevelEnd()` |
-| `error` | `severity`, `message`, `error_type`, `handled`, `fingerprint` | `TrackError()` |
-| `identify` | `user_id`, `traits` | `Identify()`, after the player signs in |
-
-The subsystem:
-
-- keeps one `anonymous_id` for each install, in `Saved/Manalens/`;
-- makes a new `session_id` for each session, never the anonymous ID;
-- sends app events (`channel: app`) with `context.app` and `engine: unreal`;
-- sends up to 50 events in a request, every 10 seconds and at 20 queued events;
-- keeps a batch after a network error or a 5xx, 408 or 429 answer and sends it
-  again with the same `message_id` values, so it counts once;
-- sends nothing from Play in Editor (`bSendInEditor=false`).
-
-Every function is a `UFUNCTION(BlueprintCallable)`, so Blueprint-only gameplay
-code can call it too:
-
-```cpp
-if (UAnalyticsSubsystem* Analytics = GetGameInstance()->GetSubsystem<UAnalyticsSubsystem>())
-{
-    Analytics->LevelStart(3, 1);
-    Analytics->LevelEnd(3, 1, 1200, /*bCompleted*/ true);
-}
-```
+- The plugin starts with the game instance. It sends `session_start`, and
+  `game_open` after consent. It sends `session_end` at quit.
+- `UExampleGameSubsystem` is the game code. It calls `SetConsent`,
+  `Identify`, `Track` (`level_start` and `level_complete`), and `TrackError`.
+- The plugin keeps unsent events on disk, in `Saved/Manalens/`, and sends
+  them at the next launch.
+- With `-ManalensDemo`, the game calls each function once, waits for the send,
+  and quits.
 
 ## Key: Publishable key
 
 This example needs the project **Publishable key** (`mana_pk_...`). It is safe
-to ship in a build. The subsystem refuses any other key at start.
+to ship in a game build.
 
 > **Never put a Secret key (`mana_sk_`) or an API key in a game build.**
 > Anyone who has the game can read `DefaultGame.ini`. For events from a
@@ -54,82 +23,152 @@ to ship in a build. The subsystem refuses any other key at start.
 
 ## Settings
 
-`Config/DefaultGame.ini`, section `[/Script/ManalensExample.AnalyticsSubsystem]`:
+The plugin reads **Project Settings > Plugins > Manalens**. The editor saves
+them in `Config/DefaultGame.ini`, section
+`[/Script/Manalens.ManalensSettings]`:
 
-| Setting | Required | Value |
+| Setting | Required | Value in this example |
 | --- | --- | --- |
-| `Endpoint` | Yes | The collector URL without `/v0/events` |
-| `PublishableKey` | Yes | The Publishable key, `mana_pk_...` |
-| `AppVersion` | No | Up to 32 characters, default `1.0.0` |
-| `Build` | No | Up to 64 characters, default `1` |
-| `Storefront` | No | `steam` (default), `itch`, `epic`, `gog`, `app_store`, `play` or `other` |
-| `bSendInEditor` | No | `false` (default). `true` sends from Play in Editor too |
+| `PublishableKey` | Yes | Empty. Set your `mana_pk_...` key. |
+| `Endpoint` | Yes | `http://localhost:3101`, the collector URL without `/v0/events` |
+| `Build` | No | `1` |
+| `Storefront` | No | `Steam` |
+| `bConsentRequired` | No | `True`: no events and no stored ID until `SetConsent(true)` |
 
-The command line wins over the file: `-ManalensEndpoint=...` and
-`-ManalensKey=...`. Without an endpoint and a key, the game runs and sends
-nothing.
+Without a key and an endpoint, the game runs and sends nothing. The full list
+of settings is in the [Unreal SDK docs](https://docs.manalens.dev/sdks/unreal).
+
+For a test run, set the values on the command line. The command line wins
+over the file:
+
+```bash
+-ini:Game:[/Script/Manalens.ManalensSettings]:PublishableKey=mana_pk_...,[/Script/Manalens.ManalensSettings]:Endpoint=http://127.0.0.1:3101
+```
+
+## Call the plugin from C++
+
+Add `"Manalens"` to the dependencies in your module's `Build.cs`, then get the
+subsystem from the game instance.
+[ExampleGameSubsystem.cpp](./Source/ManalensExample/ExampleGameSubsystem.cpp)
+has each call:
+
+```cpp
+#include "ManalensSubsystem.h"
+
+UManalensSubsystem* Manalens = GetGameInstance()->GetSubsystem<UManalensSubsystem>();
+
+// The player accepted analytics.
+Manalens->SetConsent(true);
+
+// The player signed in.
+Manalens->Identify(TEXT("player-123"), { { TEXT("difficulty"), TEXT("normal") } }, {}, {});
+
+// A game event: text, number, and true or false properties.
+Manalens->Track(TEXT("level_complete"), {}, { { TEXT("level"), 3 }, { TEXT("score"), 1200 } }, { { TEXT("perfect"), true } });
+
+// An error.
+FManalensErrorOptions Options;
+Options.Severity = EManalensSeverity::Critical;
+Options.ErrorType = TEXT("SaveFailed");
+Manalens->TrackError(TEXT("Save failed for slot 2"), Options);
+```
+
+## Call the plugin from Blueprint
+
+Each function is a Blueprint node in the **Manalens** category. For example,
+to send `level_complete` from a Level Blueprint or an Actor:
+
+1. Right-click the graph and add **Get ManalensSubsystem** (under
+   **Subsystems > Game Instance**).
+2. Drag from its output and add **Track**.
+3. Set **Event Name** to `level_complete`.
+4. On **Numbers**, add a **Make Map** node with the keys `level` and `score`.
+5. Connect the execution pin from your level end event.
+
+**Set Consent**, **Identify**, and **Track Error** work the same way.
 
 ## Run against the local stack
 
 1. Start the Manalens API (`http://localhost:3101`) and the local
-   worker from the main repository.
-2. Check the request format first, without Unreal. From the repository root:
+   worker from the main repository. A game sends no `Origin` header, so any
+   local project works.
+2. Get the plugin (see [How the plugin is installed](#how-the-plugin-is-installed)):
 
    ```bash
-   MANALENS_SMOKE_ONLY=unreal-http pnpm smoke
+   ./get-plugin.sh
    ```
 
-   It sends `request.example.json` (the body that the subsystem sends) with new
-   IDs and times.
-3. Open `ManalensExample.uproject` with Unreal Engine 5. Unreal asks to build
-   the module: click **Yes**. (Or right-click the `.uproject` file and choose
-   **Generate Visual Studio project files**, then build in your IDE.)
-4. Package a development build (**Platforms > your platform > Package
-   Project**). Play in Editor sends nothing by default.
-5. Run the packaged game with the demo flag. It sends level events, an error
-   and an `identify`, then quits:
+3. Build the editor target. On macOS with Unreal Engine 5.8:
 
    ```bash
-   ./ManalensExample -ManalensDemo -ManalensEndpoint=http://localhost:3101 -ManalensKey=mana_pk_... -log
+   "/Users/Shared/Epic Games/UE_5.8/Engine/Build/BatchFiles/Mac/Build.sh" \
+     ManalensExampleEditor Mac Development -Project="$PWD/ManalensExample.uproject"
    ```
 
-   Each request prints `MANALENS_SEND status=202 events=N` in the log. The
-   events appear in **Activity** after a short delay. Filter by engine
+   Or open `ManalensExample.uproject` and click **Yes** when Unreal asks to
+   build the modules.
+4. Run the headless demo. It prints `MANALENS_SEND ok=true events=N` after
+   each request and `MANALENS_DEMO done` before it quits:
+
+   ```bash
+   "/Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor-Cmd" \
+     "$PWD/ManalensExample.uproject" -game -nullrhi -nosound -unattended -stdout \
+     -ManalensDemo \
+     -ini:Game:[/Script/Manalens.ManalensSettings]:PublishableKey=mana_pk_...,[/Script/Manalens.ManalensSettings]:Endpoint=http://127.0.0.1:3101
+   ```
+
+   The events appear in **Activity** after a short delay. Filter by engine
    `unreal`.
 
-The smoke test runs step 5 when `UNREAL_GAME` is the path of the packaged
-binary:
+The smoke test runs step 4 when `UNREAL_EDITOR` is the path of
+`UnrealEditor-Cmd`, or when `UNREAL_GAME` is the path of a packaged game:
 
 ```bash
-UNREAL_GAME=/path/to/ManalensExample MANALENS_SMOKE_ONLY=unreal pnpm smoke
+UNREAL_EDITOR="/Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor-Cmd" MANALENS_SMOKE_ONLY=unreal pnpm smoke
 ```
 
-## What you still need to add
+Play in Editor sends nothing by default. Turn on **Enabled In Editor** in the
+plugin settings to send events from it.
 
-The subsystem is a starting point. Before you ship, add:
+## Run against a hosted endpoint
 
-- **A queue on disk.** Unsent events are lost when the game quits or
-  crashes. Save the queue at quit, load it at the next launch, and drop events
-  older than 7 days: one old event makes the collector refuse the whole batch.
-- **A wait at quit.** The last request (with `session_end`) can be lost when
-  the process exits.
-- **Retry-After** after a 429, and a longer wait between retries.
-- **Consent.** If your players must opt in, do not start the subsystem (or
-  drop events) until they do.
-- **A check on each platform you ship.** Log one `message_id` and one
-  `original_timestamp` from each platform and check that the collector
-  accepts them.
+Set **Endpoint** to your collector URL and **Publishable Key** to the key,
+then package the game.
+
+## How the plugin is installed
+
+The plugin is not in this repository. [get-plugin.sh](./get-plugin.sh)
+downloads release `v0.1.0` of
+[manalens-unreal](https://github.com/manalens/manalens-unreal) (MIT) and puts
+its `Manalens` folder in `Plugins/Manalens`. `Plugins/` is in `.gitignore`.
+`ManalensExample.uproject` turns the plugin on.
+
+In your own project, use one of these:
+
+- **Download:** get the `v0.1.0` source archive from the
+  [releases page](https://github.com/manalens/manalens-unreal/releases) and
+  copy its `Manalens` folder into `Plugins/`.
+- **Git:** clone the repository and copy or link its `Manalens` folder into
+  `Plugins/`:
+
+  ```bash
+  git clone --branch v0.1.0 https://github.com/manalens/manalens-unreal.git
+  cp -R manalens-unreal/Manalens Plugins/Manalens
+  ```
+
+A Blueprint-only project needs one C++ class before Unreal builds the plugin
+(**Tools > New C++ Class**).
 
 ## CI
 
-The examples CI does not build this project: building needs the Unreal Engine.
-The `unreal-http` smoke check tests the request format without it.
+The examples CI does not build this project: building needs the Unreal
+Engine. Run the `unreal` smoke check on a machine with Unreal Engine 5.
 
 ## Files
 
-- `Source/ManalensExample/AnalyticsSubsystem.h`, `.cpp`: the subsystem. Copy
-  both into your game module.
-- `Source/ManalensExample/ManalensExample.Build.cs`: adds the `HTTP` and
-  `Json` modules. Add them to your own module's `Build.cs`.
-- `Config/DefaultGame.ini`: the settings.
-- `request.example.json`: one request body, as the subsystem sends it.
+- `Source/ManalensExample/ExampleGameSubsystem.h`, `.cpp`: the game code that
+  calls the plugin.
+- `Source/ManalensExample/ManalensExample.Build.cs`: adds the `Manalens`
+  module.
+- `Config/DefaultGame.ini`: the plugin settings.
+- `get-plugin.sh`: downloads the plugin into `Plugins/Manalens`.

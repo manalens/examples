@@ -1,13 +1,19 @@
 {
 	"FileVersion": 3,
-	"EngineAssociation": "5.7",
+	"EngineAssociation": "5.8",
 	"Category": "",
-	"Description": "Manalens example: game events from C++ over HTTP",
+	"Description": "Manalens example: the Manalens Unreal plugin from C++ and Blueprint",
 	"Modules": [
 		{
 			"Name": "ManalensExample",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "Manalens",
+			"Enabled": true
 		}
 	]
 }
