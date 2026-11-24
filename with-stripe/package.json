@@ -1,5 +1,5 @@
 {
-  "name": "with-stripe-paddle",
+  "name": "with-stripe",
   "private": true,
   "type": "module",
   "engines": {

@@ -19,13 +19,10 @@ const app = createApp({
   cookieSecret: process.env.COOKIE_SECRET || randomBytes(32).toString('hex'),
   stripe: stripeKey ? new Stripe(stripeKey) : undefined,
   stripePriceId: process.env.STRIPE_PRICE_ID,
-  paddleClientToken: process.env.PADDLE_CLIENT_TOKEN,
-  paddlePriceId: process.env.PADDLE_PRICE_ID,
 });
 
 const port = Number(process.env.PORT || 8090);
 app.listen(port, () => {
   console.log(`Open http://localhost:${port}/ (or http://<your project domain>:${port}/ for a *.localhost project domain)`);
   if (!stripeKey) console.log('Stripe is off: set STRIPE_SECRET_KEY and STRIPE_PRICE_ID.');
-  if (!process.env.PADDLE_CLIENT_TOKEN) console.log('Paddle is off: set PADDLE_CLIENT_TOKEN and PADDLE_PRICE_ID.');
 });
