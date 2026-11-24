@@ -1,0 +1,15 @@
+{
+  "name": "with-html",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.6"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env serve.mjs",
+    "check": "node serve.mjs --check"
+  },
+  "dependencies": {
+    "@manalens/web": "file:../vendor/manalens-web-0.1.0.tgz"
+  }
+}

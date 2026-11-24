@@ -1,0 +1,19 @@
+{
+  "name": "with-astro",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "node scripts/snippet.mjs && astro dev",
+    "build": "node scripts/snippet.mjs && astro build",
+    "preview": "astro preview",
+    "check": "node scripts/snippet.mjs --check"
+  },
+  "dependencies": {
+    "@manalens/web": "file:../vendor/manalens-web-0.1.0.tgz",
+    "astro": "^7.4.12"
+  }
+}

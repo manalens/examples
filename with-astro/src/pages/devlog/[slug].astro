@@ -1,0 +1,26 @@
+---
+import Base from '../../layouts/Base.astro';
+import { posts, type Post } from '../../data/posts';
+
+export function getStaticPaths() {
+  return posts.map(post => ({ params: { slug: post.slug }, props: { post } }));
+}
+
+const { post } = Astro.props as { post: Post };
+const index = posts.indexOf(post);
+const next = posts[index + 1];
+---
+<Base title={post.title} viewTransitions>
+  <article>
+    <h1 transition:name="post-title">{post.title}</h1>
+    <p class="note">{post.date}</p>
+    <p>{post.body}</p>
+  </article>
+  <p>
+    <button type="button" data-wishlist>Wishlist on Steam</button>
+  </p>
+  <p>
+    <a href="/devlog/">All posts</a>
+    {next && <> | <a href={`/devlog/${next.slug}/`}>Next: {next.title}</a></>}
+  </p>
+</Base>

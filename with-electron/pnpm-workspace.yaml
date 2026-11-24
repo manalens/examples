@@ -1,0 +1,3 @@
+# Electron downloads its binary in a postinstall script.
+allowBuilds:
+  electron: true

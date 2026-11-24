@@ -1,0 +1,116 @@
+---
+import { ClientRouter } from 'astro:transitions';
+import { MANALENS_ENDPOINT, MANALENS_PUBLISHABLE_KEY, MANALENS_SNIPPET_INTEGRITY, MANALENS_SNIPPET_SRC } from '../config';
+
+interface Props {
+  title: string;
+  /** Use View Transitions (<ClientRouter />) on this page. The devlog pages do. */
+  viewTransitions?: boolean;
+}
+
+const { title, viewTransitions = false } = Astro.props;
+const path = Astro.url.pathname;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} | Harbor Lights</title>
+    {viewTransitions && <ClientRouter />}
+
+    {/*
+      The Manalens snippet. It makes window.manalens.
+
+      - is:inline: Astro writes the tag as it is. It does not bundle the file.
+      - integrity + crossorigin: Subresource Integrity. The browser refuses
+        the file when its bytes change. Change the file and the hash together.
+      - data-publishable-key: the project Publishable key (mana_pk_...). Public.
+      - data-endpoint: the collector URL, without /v0/events.
+      - data-auto-pageviews="false": the snippet sends no page view by itself.
+        The script below calls page() on each astro:page-load.
+      - defer: the file loads in parallel and runs after the HTML is parsed.
+
+      An empty PUBLIC_MANALENS_PUBLISHABLE_KEY turns analytics off: no tag.
+    */}
+    {MANALENS_PUBLISHABLE_KEY && MANALENS_ENDPOINT && (
+      <script
+        is:inline
+        src={MANALENS_SNIPPET_SRC}
+        integrity={MANALENS_SNIPPET_INTEGRITY}
+        crossorigin="anonymous"
+        data-publishable-key={MANALENS_PUBLISHABLE_KEY}
+        data-endpoint={MANALENS_ENDPOINT}
+        data-auto-pageviews="false"
+        defer
+      ></script>
+    )}
+
+    {/*
+      The analytics calls of this site. In the <head>, so that View
+      Transitions run it one time only: the router keeps a head script that
+      is the same on the next page, but runs each body script again.
+      The listeners are on document (event delegation), so they work on the
+      new page content after a swap.
+    */}
+    <script is:inline>
+      (function () {
+        if (window.__harborAnalytics) return;
+        window.__harborAnalytics = true;
+        function sdk() { return window.manalens; }
+
+        // One page view per page. The snippet has data-auto-pageviews="false",
+        // so these are the only page views.
+        // - With <ClientRouter />: astro:page-load fires after the first load
+        //   and after each navigation (links, back and forward), when the new
+        //   page and its title are in place.
+        // - Without it (the home page): astro:page-load never fires. Each
+        //   link loads a full page, so send on the window load event.
+        function sendPage() { if (sdk()) sdk().page(); }
+        document.addEventListener('astro:page-load', sendPage);
+        if (!document.querySelector('meta[name="astro-view-transitions-enabled"]')) {
+          window.addEventListener('load', sendPage);
+        }
+
+        // A custom event: the "Wishlist on Steam" button.
+        document.addEventListener('click', function (event) {
+          var button = event.target instanceof Element && event.target.closest('[data-wishlist]');
+          if (!button || !sdk()) return;
+          sdk().track('wishlist_clicked', { store: 'steam' });
+        });
+
+        // identify() after the newsletter form. The form is fake: it sends no
+        // email. In a real site, use the ID that your newsletter service or
+        // your backend gives the subscriber. Do not use the email as the ID.
+        document.addEventListener('submit', function (event) {
+          var form = event.target instanceof HTMLFormElement && event.target.matches('[data-newsletter]') && event.target;
+          if (!form) return;
+          event.preventDefault();
+          var status = form.querySelector('[data-newsletter-status]');
+          var done = function () { if (status) status.textContent = 'Thanks! identify() sent: subscriber_demo_42'; };
+          if (!sdk()) { done(); return; }
+          // identify() sends the queue at once.
+          sdk().identify('subscriber_demo_42', { newsletter: true }).then(done, done);
+        });
+      })();
+    </script>
+
+    <style is:global>
+      body { font-family: system-ui, sans-serif; max-width: 680px; margin: 40px auto; padding: 0 16px; color: #0f172a; line-height: 1.5; }
+      nav { display: flex; gap: 16px; margin-bottom: 24px; }
+      nav a[aria-current='page'] { font-weight: 700; }
+      button, input { font: inherit; padding: 8px 12px; border-radius: 6px; border: 1px solid #94a3b8; }
+      button { background: #f8fafc; cursor: pointer; }
+      .note { color: #475569; font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="/" aria-current={path === '/' ? 'page' : undefined}>Home</a>
+      <a href="/devlog/" aria-current={path.startsWith('/devlog/') ? 'page' : undefined}>Devlog</a>
+    </nav>
+    <main>
+      <slot />
+    </main>
+  </body>
+</html>

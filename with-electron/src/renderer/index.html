@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Manalens: Electron example</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/renderer.mjs"></script>
+  </head>
+  <body>
+    <main>
+      <h1>Harbor Run</h1>
+      <p>A stand-in for your game. Each button sends an event.</p>
+      <p>Level <strong id="level">1</strong></p>
+      <div class="buttons">
+        <button id="complete">Complete level</button>
+        <button id="fail">Fail level</button>
+        <button id="error">Throw an error</button>
+        <button id="crash">Simulate a crash</button>
+      </div>
+      <p class="hint">After "Simulate a crash", start the app again: the main process sends <code>app_unclean_exit</code>.</p>
+      <pre id="ids"></pre>
+    </main>
+  </body>
+</html>

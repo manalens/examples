@@ -1,0 +1,21 @@
+{
+  "name": "with-electron",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Manalens in an Electron game: web SDK in the renderer, Node SDK in app mode in the main process.",
+  "type": "module",
+  "main": "src/main.mjs",
+  "scripts": {
+    "start": "electron .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@manalens/node": "file:../vendor/manalens-node-0.1.0.tgz",
+    "@manalens/web": "file:../vendor/manalens-web-0.1.0.tgz"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "electron": "44.5.1",
+    "typescript": "^5.9.3"
+  }
+}

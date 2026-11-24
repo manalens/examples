@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Harbor Lights soundtrack: Manalens Stripe and Paddle example</title>
+    <!-- The Manalens snippet: page views, and window.manalens for identify(). -->
+    <script
+      src="/snippet.global.js"
+      data-publishable-key="%MANALENS_PUBLISHABLE_KEY%"
+      data-endpoint="%MANALENS_ENDPOINT%"
+      defer
+    ></script>
+    <!-- Paddle.js, only for the Paddle button. -->
+    <script src="https://cdn.paddle.com/paddle/v2/paddle.js" defer></script>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 640px; margin: 48px auto; padding: 0 16px; color: #0f172a; }
+      button { padding: 8px 14px; border-radius: 6px; border: 1px solid #94a3b8; background: #f8fafc; cursor: pointer; margin: 4px 8px 4px 0; }
+      button:disabled { cursor: not-allowed; opacity: 0.5; }
+      code { background: #f1f5f9; padding: 1px 4px; border-radius: 4px; }
+      #status { color: #475569; font-size: 14px; }
+    </style>
+  </head>
+  <body
+    data-player-id="%PLAYER_ID%"
+    data-stripe-enabled="%STRIPE_ENABLED%"
+    data-paddle-token="%PADDLE_CLIENT_TOKEN%"
+    data-paddle-price="%PADDLE_PRICE_ID%"
+  >
+    <h1>Harbor Lights: original soundtrack</h1>
+    <p>Signed in as <code id="player"></code>. The same ID goes to Manalens and to the checkout.</p>
+    <p>
+      <button id="stripe" type="button">Buy with Stripe</button>
+      <button id="paddle" type="button">Buy with Paddle</button>
+    </p>
+    <p id="status"></p>
+    <script>
+      const body = document.body.dataset;
+      const status = document.getElementById('status');
+      document.getElementById('player').textContent = body.playerId;
+
+      // 1. Manalens: identify the signed-in player with the opaque player ID,
+      //    never an email address. The snippet loads with defer, like this
+      //    listener, so it is there on DOMContentLoaded.
+      window.addEventListener('DOMContentLoaded', () => {
+        window.manalens?.identify(body.playerId);
+      });
+
+      // 2. Stripe: the server creates the Checkout Session with
+      //    metadata.user_id. The browser does not send the player ID.
+      const stripeButton = document.getElementById('stripe');
+      stripeButton.disabled = body.stripeEnabled !== 'true';
+      stripeButton.addEventListener('click', async () => {
+        window.manalens?.track('checkout_started', { provider: 'stripe', sku: 'soundtrack' });
+        const response = await fetch('/api/stripe/checkout', { method: 'POST' });
+        const result = await response.json();
+        if (!response.ok) { status.textContent = result.error; return; }
+        await window.manalens?.flush(true);
+        location.href = result.url;
+      });
+
+      // 3. Paddle: Paddle.js opens the checkout with customData.user_id.
+      const paddleButton = document.getElementById('paddle');
+      paddleButton.disabled = !body.paddleToken || !body.paddlePrice;
+      window.addEventListener('DOMContentLoaded', () => {
+        if (!body.paddleToken || !window.Paddle) return;
+        // A test_ token is a sandbox token. Manalens refuses sandbox keys, so a
+        // sandbox purchase never shows as revenue.
+        if (body.paddleToken.startsWith('test_')) window.Paddle.Environment.set('sandbox');
+        window.Paddle.Initialize({ token: body.paddleToken });
+      });
+      paddleButton.addEventListener('click', () => {
+        window.manalens?.track('checkout_started', { provider: 'paddle', sku: 'soundtrack' });
+        window.Paddle.Checkout.open({
+          items: [{ priceId: body.paddlePrice, quantity: 1 }],
+          customData: { user_id: body.playerId },
+          settings: { successUrl: `${location.origin}/thanks?provider=paddle` },
+        });
+      });
+    </script>
+  </body>
+</html>

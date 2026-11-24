@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pricing: Manalens HTML example</title>
+    <!--
+      The Manalens snippet. It sends a page view on load and makes
+      window.manalens.
+
+      - integrity + crossorigin: Subresource Integrity. The browser refuses the
+        file when its bytes change. Change the file and the hash together.
+      - data-publishable-key: the project Publishable key (mana_pk_...). Public.
+      - data-endpoint: the collector URL, without /v0/events.
+
+      serve.mjs fills in the two %...% values from .env. On your own site,
+      write the values in the tag. When the package is on npm, use
+      the pinned jsDelivr URL and its hash from the release notes instead of
+      /snippet.global.js. See README.md.
+    -->
+    <script
+      src="/snippet.global.js"
+      integrity="sha384-fa8kKszqkVfGui08QOz2J2//SfGAhBS1MhSmBAJBj7sgBPjb2L0/SFqJd6YiLE6o"
+      crossorigin="anonymous"
+      data-publishable-key="%MANALENS_PUBLISHABLE_KEY%"
+      data-endpoint="%MANALENS_ENDPOINT%"
+      defer
+    ></script>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 640px; margin: 48px auto; padding: 0 16px; color: #0f172a; }
+      button { padding: 8px 14px; border-radius: 6px; border: 1px solid #94a3b8; background: #f8fafc; cursor: pointer; }
+      #status { color: #475569; font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <h1>Pricing</h1>
+    <p>This page sent a page view when it loaded. The button sends a custom event.</p>
+    <p>
+      <button id="signup" type="button">Sign up</button>
+      <a href="/">Home</a>
+    </p>
+    <p id="status"></p>
+    <script>
+      document.getElementById('signup').addEventListener('click', function () {
+        // The snippet loads with defer, so check that it is there.
+        if (!window.manalens) return;
+        window.manalens.track('signup_clicked', { plan: 'starter', source: 'html_example' });
+        document.getElementById('status').textContent = 'Sent signup_clicked.';
+      });
+    </script>
+  </body>
+</html>

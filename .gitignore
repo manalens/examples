@@ -1,0 +1,55 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Builds
+.next
+out
+dist
+build
+*.tsbuildinfo
+next-env.d.ts
+
+# Godot
+.godot/
+export_presets.cfg
+
+# Unreal Engine
+with-unreal/Binaries/
+with-unreal/Intermediate/
+with-unreal/Saved/
+with-unreal/DerivedDataCache/
+with-unreal/*.sln
+
+# Electron
+release/
+
+# Environment files (keep the .env.example files)
+.env
+.env.*
+!.env.example
+*.local
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS and editors
+.DS_Store
+.vscode
+.idea
+
+# Agents and test output
+.claude/
+.agents/
+.playwright-mcp/
+test-results
+
+# Next.js writes this agent guide on build
+with-next/AGENTS.md
+
+# Astro
+.astro/
+# Copied from the installed SDK package by with-astro/scripts/snippet.mjs
+with-astro/public/snippet.global.js

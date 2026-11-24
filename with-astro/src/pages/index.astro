@@ -1,0 +1,23 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="Home">
+  <h1>Harbor Lights</h1>
+  <p>A small game about a lighthouse keeper. This page has no View Transitions: each link here loads a full page, and the layout sends the page view on the window load event.</p>
+
+  <h2>Wishlist</h2>
+  <p>
+    <button type="button" data-wishlist>Wishlist on Steam</button>
+  </p>
+  <p class="note">Sends <code>track('wishlist_clicked', {'{'} store: 'steam' {'}'})</code>. A real button also opens the Steam page.</p>
+
+  <h2>Newsletter</h2>
+  <form data-newsletter>
+    <input type="email" name="email" placeholder="you@example.com" required aria-label="Email" />
+    <button type="submit">Subscribe</button>
+    <p class="note" data-newsletter-status></p>
+  </form>
+  <p class="note">A fake form: it sends no email. After the submit, the page calls <code>identify()</code>.</p>
+
+  <p><a href="/devlog/">Read the devlog</a> (View Transitions)</p>
+</Base>

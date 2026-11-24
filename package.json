@@ -1,0 +1,17 @@
+{
+  "name": "manalens-examples",
+  "private": true,
+  "type": "module",
+  "description": "Runnable examples for the Manalens SDKs. Each with-* folder is its own project.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "install:all": "node scripts/each.mjs install",
+    "check:all": "node scripts/each.mjs check",
+    "smoke": "node --env-file-if-exists=.env scripts/smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.65.1"
+  }
+}
