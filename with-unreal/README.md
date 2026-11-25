@@ -31,7 +31,8 @@ them in `Config/DefaultGame.ini`, section
 | --- | --- | --- |
 | `PublishableKey` | Yes | Empty. Set your `mana_pk_...` key. |
 | `Endpoint` | Yes | `http://localhost:3101`, the collector URL without `/v0/events` |
-| `Build` | No | `1` |
+| `Build` | No | `1`. Set `dev` for test runs. |
+| `bEnabledInEditor` | No | `True`: Play in Editor sends events |
 | `Storefront` | No | `Steam` |
 | `bConsentRequired` | No | `True`: no events and no stored ID until `SetConsent(true)` |
 
@@ -127,8 +128,12 @@ The smoke test runs step 4 when `UNREAL_EDITOR` is the path of
 UNREAL_EDITOR="/Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor-Cmd" MANALENS_SMOKE_ONLY=unreal pnpm smoke
 ```
 
-Play in Editor sends nothing by default. Turn on **Enabled In Editor** in the
-plugin settings to send events from it.
+Play in Editor sends events, because this example sets **Enabled In Editor**
+(`bEnabledInEditor=True`). Dev and live data go to the same project. To
+tell test builds apart, set **Build** (for example `dev`) and filter by it.
+The plugin has one **Build** setting, so change it by hand
+for a test run, or set it on the command line:
+`-ini:Game:[/Script/Manalens.ManalensSettings]:Build=dev`.
 
 ## Run against a hosted endpoint
 

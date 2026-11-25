@@ -49,6 +49,13 @@ For a shipped game, put the values in the project settings (3).
 The SDK keeps unsent events in `user://manalens_queue.json` and sends
 them at the next launch.
 
+## Editor runs
+
+The SDK sends events from the editor too. Dev and live data go to the same
+project. To tell test builds apart, set `build` (for example `"dev"`) and
+filter by it. This example sets `build` to `"dev"` when
+`OS.has_feature("editor")` is true, and to `"1"` in an exported game.
+
 ## Run against a hosted endpoint
 
 Set `manalens/endpoint` to your collector URL and
