@@ -51,7 +51,7 @@ every `VITE_*` value in the browser bundle.
 | `VITE_MANALENS_PUBLISHABLE_KEY` | Yes | The Publishable key, `mana_pk_...` |
 | `VITE_MANALENS_ENDPOINT` | Yes | The collector URL without `/v0/events` |
 | `VITE_MANALENS_STOREFRONT` | No | `itch` (default), `steam`, `epic`, `gog`, `app_store`, `play` or `other` |
-| `VITE_MANALENS_BUILD` | No | The build label, default `1` |
+| `VITE_MANALENS_BUILD` | No | The build label. Default: `dev` under `pnpm dev`, `1` in `pnpm build` |
 
 Without a key, the game runs and sends nothing.
 
@@ -70,6 +70,11 @@ Without a key, the game runs and sends nothing.
 
 4. Open `http://localhost:5173/` (project domain `localhost`) or
    `http://<name>.localhost:5173/`.
+
+The SDK tracks `localhost`. Dev and live data go to the same project. To
+tell test builds apart, set `build` (for example `"dev"`) and filter by it.
+Under `pnpm dev`, this example sets
+`build` to `"dev"`.
 
 ## Run against a hosted endpoint
 

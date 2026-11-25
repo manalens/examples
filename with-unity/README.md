@@ -40,8 +40,10 @@ For a shipped game, put the values in the constants (3).
 2. Open the folder in Unity Hub (**Add > Add project from disk**) with Unity
    2021.3 or newer. The first import takes a few minutes.
 3. Put the key in `PublishableKey` in `ExampleGame.cs`, then press **Play**.
-   The example sends events from Play mode too. In your own game, use
-   `Enabled = !Application.isEditor` or a test project key in the editor.
+   The example sends events from Play mode too, with `Build` set to `"dev"`
+   (`Application.isEditor ? "dev" : "1"`). Dev and live data go to the same
+   project. To tell test builds apart, set `build` (for example `"dev"`) and
+   filter by it.
 4. Headless demo (no window, no input). Build a player, then run it in batch
    mode. It sends a set of events, waits for the send, logs
    `MANALENS_DEMO {...}` and exits with code 0 when every request got a 2xx
