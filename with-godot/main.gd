@@ -34,7 +34,8 @@ func _ready() -> void:
 		"publishable_key": publishable_key,
 		"endpoint": endpoint,
 		"app_version": ProjectSettings.get_setting("application/config/version", "1.0.0"),
-		"build": "1",
+		# Editor runs send events too. Tag them "dev" so you can filter them out.
+		"build": "dev" if OS.has_feature("editor") else "1",
 		"storefront": "itch",
 		"debug": args.has("debug"),
 		# The demo waits longer for the last send than a player would.

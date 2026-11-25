@@ -25,7 +25,8 @@ const analytics = publishableKey && endpoint
         engine: 'other',
         storefront: storefront as 'itch',
         app_version: __APP_VERSION__,
-        build: (import.meta.env.VITE_MANALENS_BUILD as string | undefined) || '1',
+        // `pnpm dev` runs are tagged "dev", so you can filter them out.
+        build: (import.meta.env.VITE_MANALENS_BUILD as string | undefined) || (import.meta.env.DEV ? 'dev' : '1'),
       },
     })
   : undefined;

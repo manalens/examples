@@ -58,13 +58,13 @@ public class ExampleGame : MonoBehaviour
         Manalens.SendFailed += (status, dropped) => Debug.LogWarning($"Manalens dropped {dropped} events (HTTP {status})");
 
         // Init() sends session_start and game_open (is_first_open, first_open_at).
-        // The platform and engine ("unity") are set for you. In a real game, use
-        // Enabled = !Application.isEditor, or a test project key in the editor.
+        // The platform and engine ("unity") are set for you. Play mode sends
+        // events too: Build is "dev" in the editor, so you can filter them out.
         var started = Manalens.Init(new ManalensOptions
         {
             PublishableKey = publishableKey,
             Endpoint = endpoint,
-            Build = "1",
+            Build = Application.isEditor ? "dev" : "1",
             Storefront = "itch",
             Debug = _args.ContainsKey("debug"),
             // The demo calls Shutdown() itself, and waits longer for the last
