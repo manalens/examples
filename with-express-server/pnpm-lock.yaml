@@ -28,7 +28,7 @@ importers:
 packages:
 
   '@manalens/node@file:../vendor/manalens-node-0.1.0.tgz':
-    resolution: {integrity: sha512-rI6lC/51abBo2hGzmXt6QluczsLnf0Ue4nZSZXpiHlq6tD6yzkWqBUzrVLqzo461tAVKRd9SjClAnJFXdl1iuQ==, tarball: file:../vendor/manalens-node-0.1.0.tgz}
+    resolution: {integrity: sha512-JRKwREPz7RJSwwrWZE5CGzJ/G65DNnKjxp9UfvSM2VQ839tCbQAi5Ci7kIWS0DBUhlfd46Bve1e5GXHCM1lBKw==, tarball: file:../vendor/manalens-node-0.1.0.tgz}
     version: 0.1.0
     engines: {node: '>=20.3'}
 

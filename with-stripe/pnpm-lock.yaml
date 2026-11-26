@@ -37,7 +37,7 @@ importers:
 packages:
 
   '@manalens/web@file:../vendor/manalens-web-0.1.0.tgz':
-    resolution: {integrity: sha512-lUHAKuT7b/0rl6U8eTGTFR9GxES5e3U2yIpuCPjRp0oQ5hSd3ItwF8gCMS85+TvjJ9fGJftiE85JfuzaMqF20g==, tarball: file:../vendor/manalens-web-0.1.0.tgz}
+    resolution: {integrity: sha512-TnGqZ8J9k5ttBurNrAgiPyrcK2pnDaCzb9kEeBytTOpJUQFCBSuM+Y6PorIysZTtNGDe9Fs4GX/dQoPc2fm8Bw==, tarball: file:../vendor/manalens-web-0.1.0.tgz}
     version: 0.1.0
 
   '@types/body-parser@1.19.6':

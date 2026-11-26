@@ -36,12 +36,12 @@ packages:
     engines: {node: '>=22.12.0'}
 
   '@manalens/node@file:../vendor/manalens-node-0.1.0.tgz':
-    resolution: {integrity: sha512-rI6lC/51abBo2hGzmXt6QluczsLnf0Ue4nZSZXpiHlq6tD6yzkWqBUzrVLqzo461tAVKRd9SjClAnJFXdl1iuQ==, tarball: file:../vendor/manalens-node-0.1.0.tgz}
+    resolution: {integrity: sha512-JRKwREPz7RJSwwrWZE5CGzJ/G65DNnKjxp9UfvSM2VQ839tCbQAi5Ci7kIWS0DBUhlfd46Bve1e5GXHCM1lBKw==, tarball: file:../vendor/manalens-node-0.1.0.tgz}
     version: 0.1.0
     engines: {node: '>=20.3'}
 
   '@manalens/web@file:../vendor/manalens-web-0.1.0.tgz':
-    resolution: {integrity: sha512-lUHAKuT7b/0rl6U8eTGTFR9GxES5e3U2yIpuCPjRp0oQ5hSd3ItwF8gCMS85+TvjJ9fGJftiE85JfuzaMqF20g==, tarball: file:../vendor/manalens-web-0.1.0.tgz}
+    resolution: {integrity: sha512-TnGqZ8J9k5ttBurNrAgiPyrcK2pnDaCzb9kEeBytTOpJUQFCBSuM+Y6PorIysZTtNGDe9Fs4GX/dQoPc2fm8Bw==, tarball: file:../vendor/manalens-web-0.1.0.tgz}
     version: 0.1.0
 
   '@types/node@24.19.2':
