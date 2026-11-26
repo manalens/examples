@@ -20,4 +20,4 @@ export const MANALENS_ENDPOINT: string = import.meta.env.PUBLIC_MANALENS_ENDPOIN
  * and the hash from the release notes.
  */
 export const MANALENS_SNIPPET_SRC = '/snippet.global.js';
-export const MANALENS_SNIPPET_INTEGRITY = 'sha384-fa8kKszqkVfGui08QOz2J2//SfGAhBS1MhSmBAJBj7sgBPjb2L0/SFqJd6YiLE6o';
+export const MANALENS_SNIPPET_INTEGRITY = 'sha384-Km4VIwmATqpPQJRiA1+Z6PUQbIp7zcB6DFoHwDkCG17lflazgfd5fmNDletUxhnH';

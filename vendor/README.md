@@ -4,8 +4,8 @@ Built copies of the SDK packages, until they are on npm.
 
 | File | Package | Source |
 | --- | --- | --- |
-| `manalens-web-0.1.0.tgz` | `@manalens/web` 0.1.0 | [manalens/manalens-js](https://github.com/manalens/manalens-js) at `84dc723` (main, 2026-11-20) |
-| `manalens-node-0.1.0.tgz` | `@manalens/node` 0.1.0 | [manalens/manalens](https://github.com/manalens/manalens) `sdks/node` at `9218cee7` (main, 2026-11-20) |
+| `manalens-web-0.1.0.tgz` | `@manalens/web` 0.1.0 | [manalens/manalens-js](https://github.com/manalens/manalens-js) at `c395b37` (main, 2026-11-26) |
+| `manalens-node-0.1.0.tgz` | `@manalens/node` 0.1.0 | [manalens/manalens](https://github.com/manalens/manalens) `sdks/node` at `b6914a64` (main, 2026-11-26) |
 | `dev.manalens.sdk-0.1.2.tgz` | `dev.manalens.sdk` 0.1.2 (Unity) | [manalens/manalens](https://github.com/manalens/manalens) `sdks/unity` at `fdf43b82` (main, 2026-11-26) |
 
 The Godot addon is in `with-godot/addons/manalens`, copied from
