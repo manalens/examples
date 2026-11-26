@@ -32,7 +32,7 @@ signal flushed(sent: int, ok: bool)
 signal send_failed(status: int, dropped: int)
 
 const LIBRARY_NAME := "Manalens Godot SDK"
-const LIBRARY_VERSION := "0.1.0"
+const LIBRARY_VERSION := "0.1.2"
 const CONFIG_PATH := "user://manalens.cfg"
 const QUEUE_PATH := "user://manalens_queue.json"
 ## Written by set_consent(false). While it exists the SDK records nothing,
@@ -57,7 +57,11 @@ const AUTO_ERRORS_PER_FRAME := 5
 const BREADCRUMBS := 20
 ## The collector keeps string properties up to 1024 characters.
 const MAX_STRING := 1024
-## Identity handoff: the URL parameter that the web SDK reads.
+## The collector refuses properties or traits with more keys, or with more
+## UTF-8 bytes of JSON (P-2700). The SDK drops the extra keys with a warning.
+const MAX_PROPERTY_KEYS := 50
+const MAX_PROPERTY_BYTES := 8 * 1024
+## Identity handoff (P-2523): the URL parameter that the web SDK reads.
 const HANDOFF_PARAM := "mana_hid"
 
 var _options := {
@@ -97,6 +101,11 @@ var _state_unreadable := false
 ## set_consent(false) could not write the opt-out marker: stay off, retry.
 var _optout_pending := false
 var _identity_active := false
+## Web export with localStorage: the state, the queue and the opt-out marker are
+## there, written at once (P-2791). user:// on web is IndexedDB, which Godot
+## writes a moment after a file is closed, so a reload in that moment lost the
+## state and the next load made a new anonymous ID.
+var _web_storage := false
 var _cfg := ConfigFile.new()
 var _queue: Array = []  # [{ "at": unix seconds, "event": envelope }]
 var _queue_dirty := false
@@ -164,7 +173,18 @@ func init(options: Dictionary) -> void:
 		push_warning("Manalens: storefront must be one of %s; ignored" % [STOREFRONTS])
 		_options.storefront = ""
 	_initialized = true
-	if FileAccess.file_exists(CONFIG_PATH):
+	_web_storage = OS.has_feature("web") and _web_storage_available()
+	if _web_storage:
+		var text = _store_read(CONFIG_PATH)
+		if text != null:
+			var parse_error := ERR_FILE_CANT_READ if text is bool else _cfg.parse(String(text))
+			if parse_error != OK:
+				_state_unreadable = true
+				_cfg = ConfigFile.new()
+				if text is String:
+					_store_write(CONFIG_PATH + ".unreadable", text)
+				push_warning("Manalens: could not read the saved state (error %d); no events until set_consent(true)" % parse_error)
+	elif FileAccess.file_exists(CONFIG_PATH):
 		var load_error := _cfg.load(CONFIG_PATH)
 		if load_error != OK:
 			# Fail closed: keep a copy, record nothing, and never overwrite the file.
@@ -239,7 +259,7 @@ func identify(user_id: String, traits: Dictionary = {}) -> void:
 	_save_cfg()
 	_touch()
 	var event := _build("identify", "", {})
-	event["traits"] = _scalars(traits)
+	event.event["traits"] = _fit(_scalars(traits), "traits")
 	_enqueue(event)
 	flush()
 
@@ -266,7 +286,7 @@ func set_consent(granted: bool) -> void:
 	if _disabled:
 		return
 	if granted:
-		if FileAccess.file_exists(OPTOUT_PATH) and DirAccess.remove_absolute(OPTOUT_PATH) != OK:
+		if _store_exists(OPTOUT_PATH) and not _store_remove(OPTOUT_PATH):
 			push_warning("Manalens: could not remove the opt-out marker; tracking stays off")
 			return
 		_optout_pending = false
@@ -294,8 +314,8 @@ func set_consent(granted: bool) -> void:
 		_cfg.erase_section("session")
 	_save_cfg()
 	_queue.clear()
-	if FileAccess.file_exists(QUEUE_PATH):
-		DirAccess.remove_absolute(QUEUE_PATH)
+	if _store_exists(QUEUE_PATH):
+		_store_remove(QUEUE_PATH)
 
 
 ## Send queued events now (one batch; the rest follows when it succeeds).
@@ -405,7 +425,9 @@ func _notification(what: int) -> void:
 		NOTIFICATION_APPLICATION_FOCUS_IN, NOTIFICATION_APPLICATION_RESUMED:
 			if _identity_active:
 				_focused = true
-				_touch()
+				# Only an open session: after shutdown() the next event starts a new one.
+				if _session_id != "":
+					_touch()
 		NOTIFICATION_PREDELETE:
 			_save_queue()
 
@@ -459,7 +481,8 @@ func _on_tick() -> void:
 	if not _identity_active:
 		return
 	# While the game has focus the player is active: keep the session alive.
-	if _focused:
+	# Only an open one: during shutdown() a tick must not start a new session.
+	if _focused and _session_id != "":
 		_touch()
 	_save_session()
 	_save_queue()
@@ -469,7 +492,7 @@ func _on_tick() -> void:
 # Identity and sessions -------------------------------------------------------
 
 func _identity_allowed() -> bool:
-	if _state_unreadable or _optout_pending or FileAccess.file_exists(OPTOUT_PATH):
+	if _state_unreadable or _optout_pending or _store_exists(OPTOUT_PATH):
 		return false
 	if _cfg.has_section_key("consent", "granted"):
 		return bool(_cfg.get_value("consent", "granted"))
@@ -502,8 +525,9 @@ func _start_identity() -> void:
 		_last_activity_at = float(_cfg.get_value("session", "last_activity_at", _session_started_at))
 		# No normal exit and the game had focus: count it as a crash (as the
 		# Sentry "abnormal" session). A game the OS closed in the background
-		# is not a crash.
-		if not bool(_cfg.get_value("session", "exited", false)) and bool(_cfg.get_value("session", "focused", true)):
+		# is not a crash. On web a closed or reloaded tab has no quit event,
+		# so every relaunch would look like a crash: no crash detection there.
+		if not bool(_cfg.get_value("session", "exited", false)) and bool(_cfg.get_value("session", "focused", true)) and _platform() != "web":
 			var crash := {"previous_session_id": previous}
 			for key in ["build", "app_version"]:
 				var value := String(_cfg.get_value("session", key, ""))
@@ -514,6 +538,9 @@ func _start_identity() -> void:
 	_start_session(now)
 	_enqueue(_build("track", "game_open", {"is_first_open": first_open, "first_open_at": String(_cfg.get_value("identity", "first_open_at", _iso(now)))}))
 	_save_cfg()
+	# Write game_open (the install signal) and app_unclean_exit to disk before
+	# any send: a process killed before the next save would lose them.
+	_save_queue()
 	if _deferred_identify != null:
 		var pending: Array = _deferred_identify
 		_deferred_identify = null
@@ -579,6 +606,10 @@ func _save_session() -> void:
 func _save_cfg() -> void:
 	if _state_unreadable:
 		return  # Never overwrite a config that could not be read.
+	if _web_storage:
+		if not _store_write(CONFIG_PATH, _cfg.encode_to_text()) and _options.debug:
+			push_warning("Manalens: could not save the state in localStorage")
+		return
 	# Write a temp file, then rename, so a crash never leaves a cut-off config.
 	var tmp := CONFIG_PATH + ".tmp"
 	var error := _cfg.save(tmp)
@@ -590,6 +621,11 @@ func _save_cfg() -> void:
 
 ## Write the opt-out marker (temp file, then rename). On failure stay off and retry.
 func _write_optout() -> void:
+	if _web_storage:
+		_optout_pending = not _store_write(OPTOUT_PATH, "opted out\n")
+		if _optout_pending:
+			push_warning("Manalens: could not write the opt-out marker; tracking stays off and the write is retried")
+		return
 	var tmp := OPTOUT_PATH + ".tmp"
 	var file := FileAccess.open(tmp, FileAccess.WRITE)
 	var ok := file != null
@@ -600,6 +636,64 @@ func _write_optout() -> void:
 	_optout_pending = not ok
 	if not ok:
 		push_warning("Manalens: could not write the opt-out marker; tracking stays off and the write is retried")
+
+
+# Storage ---------------------------------------------------------------------
+# One place for the files of the SDK. On web with localStorage (_web_storage):
+# the browser's localStorage, written at once. Keys start with the user data
+# folder, which has the project name: games on one origin (for example
+# html-classic.itch.zone) share one localStorage. A file from SDK 0.1.0 moves
+# to localStorage on its first read. Elsewhere: the files in user://.
+
+func _web_storage_available() -> bool:
+	return str(JavaScriptBridge.eval("(function(){try{var k='__manalens_probe__';localStorage.setItem(k,'1');localStorage.removeItem(k);return '1'}catch(e){return '0'}})()", true)) == "1"
+
+
+func _web_key(path: String) -> String:
+	return "manalens:%s:%s" % [OS.get_user_data_dir(), path.trim_prefix("user://")]
+
+
+## The text, null when it is missing, or false when it could not be read.
+func _store_read(path: String) -> Variant:
+	if not _web_storage:
+		if not FileAccess.file_exists(path):
+			return null
+		var file := FileAccess.open(path, FileAccess.READ)
+		if file == null:
+			return false
+		return file.get_as_text()
+	var result := str(JavaScriptBridge.eval("(function(){try{var v=localStorage.getItem(%s);return v===null?'0':'1'+v}catch(e){return '2'}})()" % JSON.stringify(_web_key(path)), true))
+	if result.begins_with("1"):
+		return result.substr(1)
+	if result != "0":
+		return false
+	# Missing in localStorage: move the file of SDK 0.1.0 once.
+	if not FileAccess.file_exists(path):
+		return null
+	var old := FileAccess.get_file_as_string(path)
+	if _store_write(path, old):
+		DirAccess.remove_absolute(path)
+	return old
+
+
+func _store_write(path: String, text: String) -> bool:
+	return str(JavaScriptBridge.eval("(function(){try{localStorage.setItem(%s,%s);return '1'}catch(e){return '0'}})()" % [JSON.stringify(_web_key(path)), JSON.stringify(text)], true)) == "1"
+
+
+func _store_exists(path: String) -> bool:
+	if not _web_storage:
+		return FileAccess.file_exists(path)
+	return _store_read(path) != null
+
+
+## Also removes the file: a later read must not bring an old value back.
+func _store_remove(path: String) -> bool:
+	var removed := true
+	if _web_storage:
+		removed = str(JavaScriptBridge.eval("(function(){try{localStorage.removeItem(%s);return '1'}catch(e){return '0'}})()" % JSON.stringify(_web_key(path)), true)) == "1"
+	if FileAccess.file_exists(path):
+		removed = DirAccess.remove_absolute(path) == OK and removed
+	return removed
 
 
 # Events and queue ------------------------------------------------------------
@@ -613,7 +707,7 @@ func _build(type: String, event: String, properties: Dictionary, at: float = -1.
 		"version": LIBRARY_VERSION,
 		"original_timestamp": _iso(when),
 		"context": _context(),
-		"properties": properties,
+		"properties": _fit(properties, "properties"),
 		"anonymous_id": _anonymous_id,
 		"session_id": _session_id,
 	}
@@ -696,6 +790,24 @@ func _refusal_reason(body: PackedByteArray) -> String:
 	return reason
 
 
+## The refused events of an accepted batch (P-2787): the collector stores the
+## valid events and lists the others in "errors". Returns the "rejected" count
+## and the reason codes, or a count of 0 when the body has none.
+func _refused_in_accepted(body: PackedByteArray) -> Dictionary:
+	var json := JSON.new()
+	if json.parse(body.get_string_from_utf8()) != OK:
+		return {"count": 0, "reason": ""}
+	var parsed = json.data
+	if typeof(parsed) != TYPE_DICTIONARY or not (typeof(parsed.get("rejected")) in [TYPE_INT, TYPE_FLOAT]) or int(parsed.rejected) <= 0:
+		return {"count": 0, "reason": ""}
+	var codes := {}
+	if typeof(parsed.get("errors")) == TYPE_ARRAY:
+		for item in parsed.errors:
+			if typeof(item) == TYPE_DICTIONARY:
+				codes[String(item.get("code", ""))] = true
+	return {"count": int(parsed.rejected), "reason": ", ".join(PackedStringArray(codes.keys()))}
+
+
 func _on_request_completed(result: int, code: int, _headers: PackedStringArray, _body: PackedByteArray) -> void:
 	var count := _in_flight.size()
 	var ok := result == HTTPRequest.RESULT_SUCCESS and code >= 200 and code < 300
@@ -715,6 +827,15 @@ func _on_request_completed(result: int, code: int, _headers: PackedStringArray, 
 			var reason := _refusal_reason(_body)
 			push_warning("Manalens: collector refused %d events (HTTP %d)%s; they are dropped" % [count, code, "" if reason == "" else " " + reason])
 			send_failed.emit(code, count)
+		else:
+			# An accepted batch can still list refused events (P-2787). They are
+			# not sent again: the same events would be refused again.
+			var refused := _refused_in_accepted(_body)
+			var dropped := mini(count, int(refused.count))
+			if dropped > 0:
+				push_warning("Manalens: collector refused %d of %d events (HTTP %d)%s; they are dropped" % [dropped, count, code, "" if refused.reason == "" else " " + refused.reason])
+				send_failed.emit(code, dropped)
+				count -= dropped
 	else:
 		_failures += 1
 		var delay := minf(MAX_BACKOFF_S, pow(2.0, float(_failures)))
@@ -730,9 +851,10 @@ func _on_request_completed(result: int, code: int, _headers: PackedStringArray, 
 
 
 func _load_queue() -> void:
-	if not FileAccess.file_exists(QUEUE_PATH):
+	var text = _store_read(QUEUE_PATH)
+	if not text is String:
 		return
-	var parsed = JSON.parse_string(FileAccess.get_file_as_string(QUEUE_PATH))
+	var parsed = JSON.parse_string(text)
 	if typeof(parsed) != TYPE_ARRAY:
 		return
 	for entry in parsed:
@@ -744,12 +866,19 @@ func _load_queue() -> void:
 func _save_queue() -> void:
 	if not _queue_dirty or not _identity_active:
 		return
-	var file := FileAccess.open(QUEUE_PATH, FileAccess.WRITE)
+	if _web_storage:
+		if _store_write(QUEUE_PATH, JSON.stringify(_queue)):
+			_queue_dirty = false
+		return
+	# Write a temp file, then rename, so a crash never leaves a cut-off queue.
+	var tmp := QUEUE_PATH + ".tmp"
+	var file := FileAccess.open(tmp, FileAccess.WRITE)
 	if file == null:
 		return
 	file.store_string(JSON.stringify(_queue))
 	file.close()
-	_queue_dirty = false
+	if DirAccess.rename_absolute(tmp, QUEUE_PATH) == OK:
+		_queue_dirty = false
 
 
 # Errors ----------------------------------------------------------------------
@@ -779,14 +908,14 @@ func _record_error(message: String, options: Dictionary, source: String) -> void
 	var error_type := String(options.get("error_type", "")).left(128)
 	var file := String(options.get("file", "")).left(256)
 	var function := String(options.get("function", "")).left(256)
-	var props := _scalars(options.get("properties", {}) if typeof(options.get("properties")) == TYPE_DICTIONARY else {})
-	props.merge({
+	# The error's own keys come first, so a trim to the limits (_fit) drops custom keys first.
+	var props := {
 		"severity": severity,
 		"message": message.left(MAX_STRING),
 		"handled": bool(options.get("handled", true)),
 		"source": source,
 		"fingerprint": String(options.get("fingerprint", "")).left(128),
-	}, true)
+	}
 	if props.fingerprint == "":
 		props.fingerprint = _fingerprint(error_type, message, file, function)
 	if error_type != "":
@@ -801,6 +930,7 @@ func _record_error(message: String, options: Dictionary, source: String) -> void
 		props["stack"] = stack.left(MAX_STRING)
 	if not _breadcrumbs.is_empty():
 		props["breadcrumbs"] = ",".join(_breadcrumbs).right(MAX_STRING)
+	props.merge(_scalars(options.get("properties", {}) if typeof(options.get("properties")) == TYPE_DICTIONARY else {}), false)
 	if not _error_allowed(String(props.fingerprint), source):
 		_errors_dropped += 1
 		return
@@ -860,6 +990,26 @@ func _platform() -> String:
 		"iOS": return "ios"
 		"Web": return "web"
 	return "other"
+
+
+## Keep keys in order while there are at most MAX_PROPERTY_KEYS keys and
+## MAX_PROPERTY_BYTES of JSON. The collector refuses a whole batch for one
+## event over a limit, so the SDK drops the extra keys with a warning.
+func _fit(values: Dictionary, field: String) -> Dictionary:
+	if values.size() <= MAX_PROPERTY_KEYS and JSON.stringify(values).to_utf8_buffer().size() <= MAX_PROPERTY_BYTES:
+		return values
+	var out := {}
+	var used := 2
+	for key in values:
+		if out.size() >= MAX_PROPERTY_KEYS:
+			break
+		var entry := JSON.stringify({key: values[key]}).to_utf8_buffer().size() - 2 + (1 if out.size() > 0 else 0)
+		if used + entry > MAX_PROPERTY_BYTES:
+			break
+		out[key] = values[key]
+		used += entry
+	push_warning("Manalens: %s over the limit of %d keys or %d bytes; %d keys dropped" % [field, MAX_PROPERTY_KEYS, MAX_PROPERTY_BYTES, values.size() - out.size()])
+	return out
 
 
 ## Keep scalar values; the collector refuses nested objects and arrays.
