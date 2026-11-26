@@ -75,7 +75,7 @@ itch.io (`*.itch.zone` is allowed by default).
 `dev.manalens.sdk` from the tarball in [vendor/](../vendor):
 
 ```json
-"dev.manalens.sdk": "file:../../vendor/dev.manalens.sdk-0.1.2.tgz"
+"dev.manalens.sdk": "file:../../vendor/dev.manalens.sdk-0.1.3.tgz"
 ```
 
 The path is relative to the `Packages` folder. The tarball is

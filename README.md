@@ -76,7 +76,7 @@ repository (MIT):
   `addons/manalens` into your project.
 - Unity: [manalens-unity](https://github.com/manalens/manalens-unity). In the
   Package Manager, add the git URL
-  `https://github.com/manalens/manalens-unity.git#v0.1.2`.
+  `https://github.com/manalens/manalens-unity.git#v0.1.3`.
 - Unreal: [manalens-unreal](https://github.com/manalens/manalens-unreal).
   Copy the `Manalens` folder into `Plugins/`.
 - The Node SDK is not public yet: copy the tarball from [vendor/](./vendor).
