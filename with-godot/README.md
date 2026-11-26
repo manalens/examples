@@ -66,6 +66,6 @@ is allowed by default).
 ## How the SDK is installed
 
 `addons/manalens` is a copy of `sdks/godot/addons/manalens`
-from the Manalens repository at commit `fdf43b82` (2026-11-26, SDK 0.1.2). The
+from the Manalens repository at commit `e0ad489e` (2026-11-26, SDK 0.1.3). The
 plugin is enabled in `project.godot`, which adds the `Manalens`
 autoload. To update, copy the folder again and note the commit here.
