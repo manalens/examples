@@ -38,8 +38,11 @@ Every example needs the collector URL (the endpoint), without `/v0/events`:
 - **Hosted:** your collector URL from the project's install page.
 
 Web events (`with-next`, `with-html`, `with-astro`, `with-react`,
-`with-threejs`, `with-stripe`, `with-paddle` and the Electron renderer) must come from a page on the **project domain** or one of
-its subdomains. For a local test, use a project with the domain `localhost`
+`with-threejs`, `with-stripe`, `with-paddle` and the Electron renderer) must come from a page on the **project domain**, one of
+its subdomains, or a host in **Project settings > Allowed origins**. A new
+project lists `*.itch.zone`, so a build on itch.io (`html.itch.zone` or
+`html-classic.itch.zone`) works with no change. For another game portal, add
+its host there. For a local test, use a project with the domain `localhost`
 or `<name>.localhost` and open the page on that host. Chromium sends every
 `*.localhost` name to your machine.
 
