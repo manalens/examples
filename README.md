@@ -61,7 +61,7 @@ The packages are not on npm yet. Until they are:
   `file:` path.
 - The Godot example has a copy of the addon in `with-godot/addons/`.
 - The Unreal plugin is not in this repository. `with-unreal/get-plugin.sh`
-  downloads release `v0.1.0` into `with-unreal/Plugins/Manalens`.
+  downloads release `v0.1.2` into `with-unreal/Plugins/Manalens`.
 
 To use an SDK in your own project now, install it from its public GitHub
 repository (MIT):
@@ -76,7 +76,7 @@ repository (MIT):
   `addons/manalens` into your project.
 - Unity: [manalens-unity](https://github.com/manalens/manalens-unity). In the
   Package Manager, add the git URL
-  `https://github.com/manalens/manalens-unity.git#v0.1.0`.
+  `https://github.com/manalens/manalens-unity.git#v0.1.2`.
 - Unreal: [manalens-unreal](https://github.com/manalens/manalens-unreal).
   Copy the `Manalens` folder into `Plugins/`.
 - The Node SDK is not public yet: copy the tarball from [vendor/](./vendor).

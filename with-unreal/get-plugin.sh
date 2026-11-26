@@ -7,7 +7,7 @@
 # The plugin source is public (MIT): https://github.com/manalens/manalens-unreal
 set -euo pipefail
 
-VERSION="${1:-v0.1.0}"
+VERSION="${1:-v0.1.2}"
 cd "$(dirname "$0")"
 rm -rf Plugins/Manalens
 mkdir -p Plugins
