@@ -5,7 +5,7 @@ declare global {
   interface Window {
     game: {
       config(): Promise<{ publishableKey: string; endpoint: string; app: AppInfo }>;
-      setAnonymousId(anonymousId: string): Promise<{ sessionId?: string; uncleanExit: boolean } | null>;
+      setAnonymousId(anonymousId: string): Promise<{ sessionId?: string; crashed: boolean } | null>;
       simulateCrash(): Promise<void>;
     };
     gameQuit?: () => Promise<void>;

@@ -9,7 +9,8 @@ A small Godot 4 project with the Manalens **Godot SDK**.
 - **Open the website** uses `link_url()`, so the website's web SDK joins the
   browser to this player.
 - On Godot 4.5 or newer, engine and script errors are sent for you. After a
-  crash, the next launch sends `app_unclean_exit`.
+  crash, the next launch sends `app_crash`. An automatic error has `source`
+  `auto`; a `track_error()` call has `source` `manual`.
 
 ## Key: Publishable key
 
@@ -65,7 +66,15 @@ is allowed by default).
 
 ## How the SDK is installed
 
-`addons/manalens` is a copy of `sdks/godot/addons/manalens`
-from the Manalens repository at commit `e0ad489e` (2026-11-26, SDK 0.1.3). The
+`addons/manalens` is a copy of the addon from release `v0.4.0` of
+[manalens-godot](https://github.com/manalens/manalens-godot) (MIT). The
 plugin is enabled in `project.godot`, which adds the `Manalens`
-autoload. To update, copy the folder again and note the commit here.
+autoload. In your own project, copy the same folder.
+
+To update, replace the folder with the addon of a newer release tag, and
+change the version here:
+
+```bash
+rm -rf addons/manalens
+git -C path/to/manalens-godot archive v0.4.0 addons/manalens | tar -x -C .
+```

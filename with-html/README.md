@@ -60,13 +60,14 @@ Set `MANALENS_ENDPOINT` to your collector URL. Serve the page from your project
 domain (or a subdomain). On a real site you do not need `serve.mjs`: copy the
 `<script>` tag into the `<head>` of every page.
 
-When the package is on npm, use the pinned jsDelivr URL and the
-`integrity` value from the release notes:
+To load the SDK from the Manalens CDN, use the pinned URL and the
+`integrity` value from the
+[release notes](https://github.com/manalens/manalens-js/releases/tag/web-v0.4.0):
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/@manalens/web@0.1.0/dist/snippet.global.js"
-  integrity="sha384-HASH_FROM_THE_RELEASE_NOTES"
+  src="https://cdn.manalens.dev/web@0.4.0"
+  integrity="sha384-6NHDgHrSAx9IB6oBb3iNn2sBrGvTn9Kp5WgXXdXYLbKVqEuK2RxvQqPQRaq1KeUE"
   crossorigin="anonymous"
   data-publishable-key="YOUR_PUBLISHABLE_KEY"
   data-endpoint="https://YOUR_COLLECTOR_ENDPOINT"
@@ -78,12 +79,9 @@ Change the version and the hash together.
 
 ## How the SDK is installed
 
-The package is not on npm yet. `pnpm install` installs the built
-copy from `../vendor/manalens-web-0.1.0.tgz`, and `serve.mjs` serves
+`pnpm install` installs `@manalens/web` (`^0.4.0`) from npm, and `serve.mjs` serves
 its `dist/snippet.global.js` as `/snippet.global.js`.
 
 `pnpm check` checks that the `integrity` value in each page matches that
-file. CI runs it. After an SDK update, put the new value in both pages.
-
-TODO: change the dependency to `"@manalens/web": "^0.1.0"`
-and show the jsDelivr tag in the pages.
+file. CI runs it. After an SDK update, put the new value in both pages. It
+is the same value as in the release notes of that version.

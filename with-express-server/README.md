@@ -80,19 +80,13 @@ is the client IP.
 
 ## How the SDK is installed
 
-`@manalens/node` is not on npm yet. `package.json` installs
-a built copy from the repository's `vendor/` folder:
+`package.json` installs the Node SDK from npm:
 
 ```json
-"@manalens/node": "file:../vendor/manalens-node-0.1.0.tgz"
+"@manalens/node": "^0.2.0"
 ```
 
-To use it in your own project now, copy the tarball and install it with
-`pnpm add ./manalens-node-0.1.0.tgz`, or build it from `sdks/node`
-in the Manalens repository.
-
-TODO: change it to `"@manalens/node": "^0.1.0"` when the
-package is on npm.
+In your own project: `pnpm add @manalens/node`.
 
 ## Files
 

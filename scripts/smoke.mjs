@@ -23,7 +23,7 @@
 // Checks:
 //   express        with-express-server: the app with a server-mode client
 //   electron-main  with-electron: the main-process module (app mode, the
-//                  running flag and app_unclean_exit), in plain Node.js
+//                  running flag and app_crash), in plain Node.js
 //   godot          with-godot: the headless demo (skipped without Godot)
 //   unity          with-unity: builds a desktop player, runs it in batch mode
 //                  with --demo (skipped without UNITY)
@@ -174,7 +174,7 @@ await check('electron-main', async () => {
   const { MainAnalytics, platformFromOS } = await import(pathToFileURL(join(root, 'with-electron/src/main-analytics.mjs')).href);
   const userDataDir = mkdtempSync(join(tmpdir(), 'manalens-electron-smoke-'));
   try {
-    // A flag left by a run that did not quit: the next start sends app_unclean_exit.
+    // A flag left by a run that did not quit: the next start sends app_crash.
     writeFileSync(join(userDataDir, 'manalens-running.json'), JSON.stringify({ session_id: randomUUID(), build: 'smoke-previous' }));
     const recorder = recordingFetch();
     const main = new MainAnalytics({
@@ -185,10 +185,10 @@ await check('electron-main', async () => {
       fetch: recorder.fetch,
     });
     const started = main.start(randomUUID());
-    if (!started.uncleanExit) throw new Error('the running flag did not give uncleanExit');
+    if (!started.crashed) throw new Error('the running flag did not give crashed');
     await main.quit();
     if (existsSync(join(userDataDir, 'manalens-running.json'))) throw new Error('quit() did not remove the running flag');
-    return `app_unclean_exit, app_started, app_quit: ${assertAll2xx(recorder.statuses, recorder.errors)}`;
+    return `app_crash, app_started, app_quit: ${assertAll2xx(recorder.statuses, recorder.errors)}`;
   } finally {
     rmSync(userDataDir, { recursive: true, force: true });
   }

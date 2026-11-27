@@ -94,7 +94,7 @@ app.whenReady().then(() => {
     if (typeof anonymousId !== 'string') return null;
     return analytics.start(anonymousId);
   });
-  // A crash for testing app_unclean_exit: exit without the normal quit steps.
+  // A crash for testing app_crash: exit without the normal quit steps.
   ipcMain.handle('game:simulate-crash', () => app.exit(1));
 
   const window = new BrowserWindow({

@@ -9,7 +9,8 @@ A small Unity project with the Manalens **Unity SDK**.
 - **Open the website** uses `LinkUrl()`, so the website's web SDK joins the
   browser to this player.
 - Unhandled exceptions and `Debug.LogError` are sent for you. After a crash,
-  the next launch sends `app_unclean_exit`.
+  the next launch sends `app_crash`. An automatic error has `source` `auto`;
+  a `TrackError()` call has `source` `manual`.
 
 The game is one script, [Assets/Scripts/ExampleGame.cs](./Assets/Scripts/ExampleGame.cs).
 It starts by itself in any scene and draws its buttons with IMGUI, so the
@@ -72,18 +73,16 @@ itch.io (`*.itch.zone` is allowed by default).
 ## How the SDK is installed
 
 [Packages/manifest.json](./Packages/manifest.json) installs the package
-`dev.manalens.sdk` from the tarball in [vendor/](../vendor):
+`dev.manalens.sdk` from its public repository,
+[manalens-unity](https://github.com/manalens/manalens-unity) (MIT), at the
+release tag `v0.3.0`:
 
 ```json
-"dev.manalens.sdk": "file:../../vendor/dev.manalens.sdk-0.1.3.tgz"
+"dev.manalens.sdk": "https://github.com/manalens/manalens-unity.git#v0.3.0"
 ```
 
-The path is relative to the `Packages` folder. The tarball is
-`sdks/unity` of the Manalens repository; the commit is in
-[vendor/README.md](../vendor/README.md). In your own project, use **Package
-Manager > + > Add package from tarball**. The manifest also lists the Unity
-modules that the SDK and this example use: UnityWebRequest, IMGUI and JSON
-serialize.
-
-TODO: when the Unity SDK has a public repository, change the
-dependency to its git URL.
+Unity Package Manager needs Git on the `PATH` for a git URL. In your own
+project, use **Package Manager > + > Add package from git URL** with the same
+URL. Keep the `#v0.3.0` tag, so your build does not change when a new version
+is released. The manifest also lists the Unity modules that the SDK and this
+example use: UnityWebRequest, IMGUI and JSON serialize.

@@ -75,14 +75,15 @@ To check the production build: `pnpm build`, then `pnpm preview`.
 Set the two variables in your host (for example the Vercel or Netlify project
 settings), build, and deploy on your project domain.
 
-When the package is on npm, load the pinned jsDelivr file instead of
-`/snippet.global.js`, and use the `integrity` value from the release notes:
+To load the SDK from the Manalens CDN instead of `/snippet.global.js`, use
+the pinned URL and the `integrity` value from the
+[release notes](https://github.com/manalens/manalens-js/releases/tag/web-v0.4.0):
 
 ```astro
 <script
   is:inline
-  src="https://cdn.jsdelivr.net/npm/@manalens/web@0.1.0/dist/snippet.global.js"
-  integrity="sha384-HASH_FROM_THE_RELEASE_NOTES"
+  src="https://cdn.manalens.dev/web@0.4.0"
+  integrity="sha384-6NHDgHrSAx9IB6oBb3iNn2sBrGvTn9Kp5WgXXdXYLbKVqEuK2RxvQqPQRaq1KeUE"
   crossorigin="anonymous"
   data-publishable-key={MANALENS_PUBLISHABLE_KEY}
   data-endpoint={MANALENS_ENDPOINT}
@@ -132,7 +133,7 @@ page view on the window `load` event instead (it checks for the
 `astro-view-transitions-enabled` meta tag that `<ClientRouter />` adds).
 
 Without `data-auto-pageviews="false"` the counts are also correct: the SDK
-build in `vendor/` waits after back and forward until the
+waits after back and forward until the
 title changes, and `page()` skips the path it sent last. The rule above is
 simpler, and it does not depend on that wait (at most 1 second).
 
@@ -147,17 +148,14 @@ these generators.
 
 ## How the SDK is installed
 
-The package is not on npm yet. `pnpm install` installs the built
-copy from `../vendor/manalens-web-0.1.0.tgz`.
+`pnpm install` installs `@manalens/web` (`^0.4.0`) from npm.
 `scripts/snippet.mjs` (run by `pnpm dev` and `pnpm build`) copies its
 `dist/snippet.global.js` to `public/snippet.global.js`. It fails when the
 file hash is not `MANALENS_SNIPPET_INTEGRITY` in `src/config.ts`.
 
 `pnpm check` checks the hash only. CI runs `pnpm build`. After an SDK update,
-put the new value in `src/config.ts`.
-
-TODO: change the dependency to `"@manalens/web": "^0.1.0"`
-and use the jsDelivr URL in `src/config.ts`.
+put the new value in `src/config.ts`. It is the same value as in the
+release notes of that version.
 
 ## Files
 

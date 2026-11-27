@@ -52,17 +52,13 @@ so build again after a change.
 
 ## How the SDK is installed
 
-The package is not on npm yet. `package.json` installs the built copy
-from the repository's `vendor/` folder:
+`package.json` installs the web SDK from npm:
 
 ```json
-"@manalens/web": "file:../vendor/manalens-web-0.1.0.tgz"
+"@manalens/web": "^0.4.0"
 ```
 
-In your own project, copy the tarball and install it, or install from GitHub
-(it is public, MIT): `pnpm add github:manalens/manalens-js`.
-
-TODO: change it to `"@manalens/web": "^0.1.0"`.
+In your own project: `pnpm add @manalens/web`.
 
 ## Files
 

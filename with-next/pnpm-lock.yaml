@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@manalens/web':
-        specifier: file:../vendor/manalens-web-0.1.0.tgz
-        version: file:../vendor/manalens-web-0.1.0.tgz
+        specifier: ^0.4.0
+        version: 0.4.0
       next:
         specifier: ^16.4.6
         version: 16.4.6(@types/node@24.19.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -201,9 +201,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@manalens/web@file:../vendor/manalens-web-0.1.0.tgz':
-    resolution: {integrity: sha512-TnGqZ8J9k5ttBurNrAgiPyrcK2pnDaCzb9kEeBytTOpJUQFCBSuM+Y6PorIysZTtNGDe9Fs4GX/dQoPc2fm8Bw==, tarball: file:../vendor/manalens-web-0.1.0.tgz}
-    version: 0.1.0
+  '@manalens/web@0.4.0':
+    resolution: {integrity: sha512-d7yTlgCHtLDJQB7dtY4RabjoaQVzhzqiWTpekl1UCegKLwTNZq8UkLyy4qAH491rPBumbFwyjfb9pjmZog5tlw==}
 
   '@next/env@16.4.6':
     resolution: {integrity: sha512-SunBjJ6t+oBtecS3dTjdVuMhUogP5wD/vrGL5EVuQYM1iS4O5ilL51HkiJ3sPjMzRHiCChvr4dbaSJbR7F3lxA==}
@@ -493,7 +492,7 @@ snapshots:
   '@img/sharp-win32-x64@0.35.5':
     optional: true
 
-  '@manalens/web@file:../vendor/manalens-web-0.1.0.tgz': {}
+  '@manalens/web@0.4.0': {}
 
   '@next/env@16.4.6': {}
 

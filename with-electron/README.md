@@ -2,18 +2,23 @@
 
 An Electron game shell with Manalens in both processes:
 
-- **Renderer:** the **web SDK** with the `app` option. `platform` comes from
-  the OS (`macos`, `windows` or `linux`). It sends page views, `game_open`,
-  `session_start`, `session_end`, level events and `error`.
+- **Renderer:** the **web SDK** with the `app` option and game mode
+  (`game: true`). `platform` comes from the OS (`macos`, `windows` or
+  `linux`). The SDK sends page views, `game_open`, `session_start`,
+  `session_end` and an `error` event for each uncaught error (`source`
+  `auto`). The page sends level events, and a handled error with
+  `trackError()` (`source` `manual`).
 - **Main process:** the **Node SDK in app mode** with the Publishable key. It
-  sends `app_started`, `app_quit` and `app_unclean_exit`.
+  sends `app_started`, `app_quit` and `app_crash`.
 - **One player:** the renderer's web SDK makes the anonymous ID. The renderer
   sends it to the main process over IPC (`game:anonymous-id`), and the main
   process uses it as `anonymousId`. Both processes count as one player.
-- **Unclean exits:** at start the main process writes a running flag file in
+- **Crashes:** at start the main process writes a running flag file in
   the user data folder. A normal quit removes it. If the flag is still there
   at the next start, the last run did not quit normally: the main process
-  sends `app_unclean_exit` with `previous_session_id` and `previous_build`.
+  sends `app_crash` with `previous_session_id`, `previous_build` and
+  `previous_app_version`. The Godot, Unity and Unreal SDKs send this event for
+  you. A browser cannot tell a crash from a close, so the web SDK does not.
 
 ## Key: Publishable key only
 
@@ -66,8 +71,8 @@ The app reads `.env` when it runs from this folder. A packaged build has no
 
 4. Click the buttons, then quit (Cmd+Q or close the window). The renderer
    sends `session_end`, and the main process sends `app_quit`.
-5. To test unclean exits, click **Simulate a crash** (or kill the process),
-   then start the app again. The main process sends `app_unclean_exit`.
+5. To test crashes, click **Simulate a crash** (or kill the process), then
+   start the app again. The main process sends `app_crash`.
 
 ## Run against a hosted endpoint
 
@@ -77,20 +82,16 @@ your project domain. The content security policy in `src/main.mjs` allows
 
 ## How the SDKs are installed
 
-The packages are not on npm yet. `package.json` installs the built
-copies from the repository's `vendor/` folder:
+`package.json` installs both packages from npm:
 
 ```json
-"@manalens/node": "file:../vendor/manalens-node-0.1.0.tgz",
-"@manalens/web": "file:../vendor/manalens-web-0.1.0.tgz"
+"@manalens/node": "^0.2.0",
+"@manalens/web": "^0.4.0"
 ```
 
 The renderer has no bundler: the main process serves the web SDK build from
 `node_modules` under `/lib/manalens-web/`. With a bundler (Vite, electron-vite,
 webpack), write `import { createAnalytics } from '@manalens/web'`.
-
-TODO: change both to `"^0.1.0"` when the packages are
-on npm.
 
 ## Files
 

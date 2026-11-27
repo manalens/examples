@@ -73,9 +73,8 @@ path, connect a live account, make a small real purchase and refund it.
 
 ## How the SDK is installed
 
-`@manalens/web` is not on npm yet. `package.json` installs the built copy from
-the repository's `vendor/` folder, and the server serves its
-`snippet.global.js`. On your own site, host the file yourself (see
+`package.json` installs `@manalens/web` (`^0.4.0`) from npm, and the server
+serves its `snippet.global.js`. On your own site, host the file yourself (see
 [with-html](../with-html)).
 
 ## Files

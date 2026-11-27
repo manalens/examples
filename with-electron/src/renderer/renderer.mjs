@@ -13,6 +13,11 @@ const analytics = createAnalytics({
   endpoint: config.endpoint,
   // platform comes from the OS (main process): macos, windows or linux.
   app: config.app,
+  // Game mode: the SDK sends session_start, game_open (is_first_open,
+  // first_open_at), session_end, and an error event for each uncaught error
+  // or unhandled rejection (source "auto"). Unsent events wait in IndexedDB
+  // for the next start.
+  game: true,
 });
 
 // The main process uses the same anonymous ID (Node SDK in app mode).
@@ -20,28 +25,16 @@ const anonymousId = analytics.getAnonymousId();
 if (anonymousId) {
   const main = await window.game.setAnonymousId(anonymousId);
   const ids = document.getElementById('ids');
-  if (ids) ids.textContent = `anonymous_id ${anonymousId}\nmain session_id ${main?.sessionId ?? ''}\nlast run crashed: ${main?.uncleanExit ?? false}`;
+  if (ids) ids.textContent = `anonymous_id ${anonymousId}\nmain session_id ${main?.sessionId ?? ''}\nlast run crashed: ${main?.crashed ?? false}`;
 }
-
-// game_open: each launch.
-const firstOpenAt = localStorage.getItem('first_open_at');
-if (!firstOpenAt) localStorage.setItem('first_open_at', new Date().toISOString());
-analytics.track('game_open', { is_first_open: !firstOpenAt, first_open_at: firstOpenAt ?? localStorage.getItem('first_open_at') });
-
-// session_start / session_end.
-const sessionStart = Date.now();
-analytics.track('session_start');
 
 /** Called by the main process before a normal quit. */
 window.gameQuit = async () => {
-  analytics.track('session_end', { duration_s: Math.round((Date.now() - sessionStart) / 1000) });
+  // The SDK ends the game session on pagehide. Electron quits before the page
+  // hides, so send that event now: it queues session_end. Then send the queue.
+  window.dispatchEvent(new Event('pagehide'));
   await analytics.flush();
 };
-
-// Uncaught errors become error events. Do not put personal data in message.
-window.addEventListener('error', event => {
-  analytics.track('error', { severity: 'error', message: String(event.message).slice(0, 200), error_type: 'uncaught', handled: false });
-});
 
 let level = 1;
 let attempt = 1;
@@ -64,7 +57,16 @@ onClick('fail', () => {
   analytics.track('level_start', { level, attempt });
 });
 onClick('error', () => {
+  // An uncaught error: game mode sends it as an error event (handled false).
   setTimeout(() => { throw new Error('Example error from the renderer'); });
+});
+onClick('handled-error', () => {
+  // A handled error: trackError() sends it with source "manual".
+  try {
+    throw new Error('Save failed');
+  } catch (error) {
+    analytics.trackError(error, { errorType: 'SaveFailed', properties: { slot: 1 } });
+  }
 });
 onClick('crash', async () => {
   await analytics.flush();

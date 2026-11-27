@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@manalens/web':
-        specifier: file:../vendor/manalens-web-0.1.0.tgz
-        version: file:../vendor/manalens-web-0.1.0.tgz
+        specifier: ^0.4.0
+        version: 0.4.0
       astro:
         specifier: ^7.4.12
         version: 7.4.12(yaml@2.9.1)
@@ -390,9 +390,8 @@ packages:
   '@jridgewell/sourcemap-codec@1.6.0':
     resolution: {integrity: sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw==}
 
-  '@manalens/web@file:../vendor/manalens-web-0.1.0.tgz':
-    resolution: {integrity: sha512-TnGqZ8J9k5ttBurNrAgiPyrcK2pnDaCzb9kEeBytTOpJUQFCBSuM+Y6PorIysZTtNGDe9Fs4GX/dQoPc2fm8Bw==, tarball: file:../vendor/manalens-web-0.1.0.tgz}
-    version: 0.1.0
+  '@manalens/web@0.4.0':
+    resolution: {integrity: sha512-d7yTlgCHtLDJQB7dtY4RabjoaQVzhzqiWTpekl1UCegKLwTNZq8UkLyy4qAH491rPBumbFwyjfb9pjmZog5tlw==}
 
   '@napi-rs/wasm-runtime@1.2.6':
     resolution: {integrity: sha512-mRyDmEw9/fCDXCGfL1sbgIw/GUK0PVxRW4YwgPN61F3LQ+fSyoBFarJVzgGyhF6kRzEQZ0FejDqm4WLXSeqQmw==}
@@ -1593,7 +1592,7 @@ snapshots:
 
   '@jridgewell/sourcemap-codec@1.6.0': {}
 
-  '@manalens/web@file:../vendor/manalens-web-0.1.0.tgz': {}
+  '@manalens/web@0.4.0': {}
 
   '@napi-rs/wasm-runtime@1.2.6(@emnapi/core@2.0.0-beta.2)(@emnapi/runtime@2.0.0-beta.2)':
     dependencies:

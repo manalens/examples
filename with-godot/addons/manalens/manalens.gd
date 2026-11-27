@@ -21,7 +21,7 @@ extends Node
 ## Errors: `track_error()` sends an `error` event. On Godot 4.5+ the SDK also
 ## sends engine and script errors (`capture_engine_errors`). When the last run
 ## ended without a normal exit (a crash or a killed process), the next launch
-## sends `app_unclean_exit` in that old session.
+## sends `app_crash` in that old session.
 
 signal flushed(sent: int, ok: bool)
 ## Events were dropped and will never be sent. `status` is the HTTP status
@@ -30,9 +30,15 @@ signal flushed(sent: int, ok: bool)
 ## older than 7 days). `dropped` is the number of events. Network errors and 5xx
 ## responses do not emit it: those events stay queued and are sent later.
 signal send_failed(status: int, dropped: int)
+## The answer to link_steam() (P-2815). `linked` is true when Steam accepted the
+## ticket. `status` is the HTTP status (0 when no request was made or the
+## network failed). `code` is the API error code, such as
+## STEAM_TICKET_INVALID or STEAM_NOT_CONNECTED, or an SDK code: STEAM_TICKET
+## (Steam gave no ticket), NETWORK_ERROR or IDENTITY_CHANGED.
+signal steam_linked(linked: bool, status: int, code: String)
 
 const LIBRARY_NAME := "Manalens Godot SDK"
-const LIBRARY_VERSION := "0.1.3"
+const LIBRARY_VERSION := "0.4.0"
 const CONFIG_PATH := "user://manalens.cfg"
 const QUEUE_PATH := "user://manalens_queue.json"
 ## Written by set_consent(false). While it exists the SDK records nothing,
@@ -45,10 +51,32 @@ const SESSION_MAX_AGE_S := 24.0 * 60.0 * 60.0
 ## The collector accepts app events up to 7 days old. Keep a margin for clock skew.
 const MAX_EVENT_AGE_S := 7.0 * 24.0 * 3600.0 - 3600.0
 const MAX_BACKOFF_S := 300.0
-const STOREFRONTS := ["steam", "itch", "epic", "gog", "app_store", "play", "other"]
+## The longest wait that a Retry-After header can ask for (1 hour).
+const MAX_RETRY_AFTER_S := 3600.0
+const HTTP_MONTHS := ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+const STOREFRONTS := ["steam", "itch", "epic", "gog", "app_store", "play", "psn", "xbox", "nintendo", "other"]
+## The `platform` option: the values the collector accepts. Leave the option
+## empty to detect the platform with OS.get_name().
+const PLATFORMS := ["windows", "macos", "linux", "web", "android", "ios", "ps5", "xbox_series", "xbox_one", "switch", "switch2", "other"]
+const AUTO_IDENTIFY := ["steam"]
+## GodotSteam may start Steam after the SDK. Try again on the flush timer this
+## many times (about one minute with the default flush interval).
+const AUTO_IDENTIFY_TRIES := 6
+## Protected traits (P-2814): only a server with the secret key may set them.
+## The collector drops them from game events, so traits() does not send them.
+const PROTECTED_TRAITS := ["email", "itch_user_id", "stripe_customer_id", "paddle_customer_id"]
+## link_steam(): the identity of the Steam Web API ticket. The server accepts only this one.
+const STEAM_TICKET_IDENTITY := "manalens"
+## link_steam() waits for a 429 Retry-After of at most this many seconds, once.
+const LINK_MAX_RETRY_AFTER_S := 60.0
+## Steam's k_EResultOK in the get_ticket_for_web_api signal.
+const STEAM_RESULT_OK := 1
 ## Project Settings > Manalens (publishable_key, endpoint, auto_init, ...).
 const Settings := preload("res://addons/manalens/settings.gd")
 const SEVERITIES := ["debug", "info", "warning", "error", "critical"]
+## The source of an error: a track_error() call, or an automatic capture.
+const SOURCE_MANUAL := "manual"
+const SOURCE_AUTO := "auto"
 const ERROR_LOGGER_PATH := "res://addons/manalens/error_logger.gd"
 ## Error limits (as Sentry Godot): the same fingerprint at most once a second,
 ## at most 20 errors in 10 seconds, at most 5 automatic errors in one frame.
@@ -77,6 +105,24 @@ var _options := {
 	"app_version": "",
 	"build": "",
 	"storefront": "",
+	## Empty: detected from OS.get_name(). Set it for a console build (a
+	## console port of Godot): ps5, xbox_series, xbox_one, switch or switch2.
+	"platform": "",
+	## "steam": after consent, identify the player once per launch as
+	## steam_<SHA-256 of "<publishable_key>:<SteamID64>"> with the trait
+	## storefront = steam, when the GodotSteam addon is present and Steam is
+	## running. Off ("") by default. An identify() call from the game wins.
+	"auto_identify": "",
+	## true: after consent, link the Steam account once per launch (P-2815):
+	## the SDK asks GodotSteam for a Web API ticket with the identity
+	## "manalens" and posts it to <api_endpoint>/v0/link. Needs the GodotSteam
+	## addon and a running Steam client; without them it does nothing. Off by
+	## default. See link_steam().
+	"steam_link": false,
+	## The API URL for link_steam(). Empty: the endpoint with an `events.`
+	## host changed to `api.` (https://events.manalens.dev gives
+	## https://api.manalens.dev); any other endpoint is used as it is.
+	"api_endpoint": "",
 	## true: no events and no persistent ID until set_consent(true).
 	"consent_required": false,
 	"flush_interval_s": 10.0,
@@ -92,9 +138,18 @@ var _options := {
 	"capture_warnings": false,
 	## Automatic errors in one session; track_error() calls do not count.
 	"max_auto_errors_per_session": 50,
+	## A dedicated server build (the `dedicated_server` feature tag, or the
+	## headless display server) is not a player. false (default): on a server
+	## build the SDK sends no game_open, session_start, session_end or
+	## app_crash, so the server does not count as an install or a
+	## session. track() and identify() still work. true: a server build sends
+	## them as a client does.
+	"track_server_builds": false,
 	"debug": false,
 }
 var _initialized := false
+## true on a server build without track_server_builds: no automatic client events.
+var _server_quiet := false
 ## true when init() ran with enabled = false: every call is a no-op.
 var _disabled := false
 ## The config file exists but could not be read: it may hold an opt-out, so
@@ -122,11 +177,25 @@ var _in_flight: Array = []  # message IDs of the batch being sent
 var _failures := 0
 var _backoff_until := 0.0
 var _deferred_identify = null  # [user_id, traits] before consent
+var _game_identified := false  # the game called identify() in this launch
+var _auto_identify_tries := 0  # auto_identify attempts left in this launch
+var _deferred_traits := {}  # traits() before consent, merged
+var _warned_protected_traits := false
+var _steam_link_tries := 0  # steam_link attempts left in this launch
+var _steam_link_done := false  # steam_link: the automatic link ran in this launch
+var _link_in_flight := false  # a ticket request or a link request is running
+var _steam_link_pending = null  # link_steam() before consent: a ticket, or true to ask Steam
+var _steam_ticket_handle := 0  # the GodotSteam ticket that the SDK waits for
+var _link_http: HTTPRequest
+var _link_body := ""
+var _link_attempt := 0
+var _link_anonymous_id := ""  # the anonymous ID of the request: a retry needs the same
 var _http: HTTPRequest
 var _timer: Timer
 var _label_re := RegEx.create_from_string("^[A-Za-z0-9._+\\- ]+$")
 var _closing := false
 var _before_send := Callable()
+var _in_before_send := false
 var _breadcrumbs: Array = []  # the last event names, oldest first
 var _error_seen := {}  # fingerprint -> ticks (ms) of the last send
 var _error_times: Array = []  # ticks (ms) of the errors sent in the last 10 s
@@ -140,9 +209,9 @@ var _quoted_re := RegEx.create_from_string("\"[^\"]*\"|'[^']*'")
 # Public API ------------------------------------------------------------------
 
 ## Start the SDK. Keys: publishable_key, endpoint (required); enabled, app_version, build,
-## storefront, consent_required, flush_interval_s, flush_at, max_queue,
+## storefront, platform, auto_identify, consent_required, flush_interval_s, flush_at, max_queue,
 ## handle_quit, quit_timeout_s, capture_engine_errors, capture_warnings,
-## max_auto_errors_per_session, debug. The values of Project Settings >
+## max_auto_errors_per_session, track_server_builds, debug. The values of Project Settings >
 ## Manalens apply first; the options override them. With a key in Project
 ## Settings and auto_init on, the autoload calls init({}) itself at the end of
 ## the first frame, unless your code called init() before.
@@ -180,7 +249,18 @@ func init(options: Dictionary = {}) -> void:
 	if String(_options.storefront) != "" and not STOREFRONTS.has(String(_options.storefront)):
 		push_warning("Manalens: storefront must be one of %s; ignored" % [STOREFRONTS])
 		_options.storefront = ""
+	if String(_options.platform) != "" and not PLATFORMS.has(String(_options.platform)):
+		push_warning("Manalens: platform must be one of %s; detected instead" % [PLATFORMS])
+		_options.platform = ""
+	if String(_options.auto_identify) != "" and not AUTO_IDENTIFY.has(String(_options.auto_identify)):
+		push_warning("Manalens: auto_identify must be \"steam\" or empty; ignored")
+		_options.auto_identify = ""
+	_auto_identify_tries = AUTO_IDENTIFY_TRIES if String(_options.auto_identify) != "" else 0
+	_steam_link_tries = AUTO_IDENTIFY_TRIES if bool(_options.steam_link) else 0
 	_initialized = true
+	_server_quiet = is_server_build() and not bool(_options.track_server_builds)
+	if _server_quiet:
+		print("Manalens: server build (dedicated_server or headless); no game_open, session or app_crash events. Set track_server_builds to send them")
 	_web_storage = OS.has_feature("web") and _web_storage_available()
 	if _web_storage:
 		var text = _store_read(CONFIG_PATH)
@@ -205,6 +285,10 @@ func init(options: Dictionary = {}) -> void:
 	_http.timeout = 10.0
 	_http.request_completed.connect(_on_request_completed)
 	add_child(_http)
+	_link_http = HTTPRequest.new()
+	_link_http.timeout = 10.0
+	_link_http.request_completed.connect(_on_link_completed)
+	add_child(_link_http)
 	_timer = Timer.new()
 	_timer.wait_time = maxf(float(_options.flush_interval_s), 1.0)
 	_timer.autostart = true
@@ -216,6 +300,12 @@ func init(options: Dictionary = {}) -> void:
 		_install_error_logger()
 	if _identity_allowed():
 		_start_identity()
+
+
+## true in a dedicated server build: the `dedicated_server` feature tag, or the
+## headless display server (`--headless`).
+static func is_server_build() -> bool:
+	return OS.has_feature("dedicated_server") or DisplayServer.get_name() == "headless"
 
 
 ## Record a named event with scalar properties (String, int, float, bool, null).
@@ -239,17 +329,27 @@ func track(event: String, properties: Dictionary = {}) -> void:
 ##                file and function, or of the message without numbers
 ##   properties   more scalar properties (level, mode, ...)
 func track_error(message: String, options: Dictionary = {}) -> void:
-	_record_error(message, options, "manual")
+	_record_error(message, options, SOURCE_MANUAL)
 
 
-## A function that gets the properties of each `error` event before it is
-## queued. Return a Dictionary to send (for example without personal data),
-## or null to drop the error. Pass Callable() to remove it.
+## A function that gets each event before it is queued: track events (also
+## error and the automatic events), identify and traits. It gets a copy of the whole
+## event Dictionary ("type", "event", "properties", "traits", "user_id",
+## "message_id", "anonymous_id", "session_id", "context", ...). Return the
+## event to send (changed or not), or null to drop it. The SDK takes "event",
+## "properties", "traits" and "user_id" from the result; it keeps the other
+## fields. When the result changes or removes "type", "message_id",
+## "anonymous_id", "session_id" or "context.app", the SDK sends the original
+## event. Errors pass the error limits first, so a dropped error still counts
+## in those limits. Do not record events inside the callback: they are
+## dropped. Pass Callable() to remove it.
 func set_before_send(callback: Callable) -> void:
 	_before_send = callback
 
 
 ## Attach a known player ID (1 to 255 characters) and traits to this device.
+## A call from the game wins over auto_identify: after it, the SDK does not
+## identify the player by Steam in this launch.
 func identify(user_id: String, traits: Dictionary = {}) -> void:
 	if _disabled:
 		return
@@ -259,11 +359,20 @@ func identify(user_id: String, traits: Dictionary = {}) -> void:
 	if user_id.length() < 1 or user_id.length() > 255:
 		push_warning("Manalens: user_id must be 1 to 255 characters")
 		return
+	_game_identified = true
+	_auto_identify_tries = 0
+	_identify(user_id, traits, "game")
+
+
+func _identify(user_id: String, traits: Dictionary, source: String) -> void:
 	if not _identity_allowed():
 		_deferred_identify = [user_id, traits]
 		return
 	_user_id = user_id
 	_cfg.set_value("identity", "user_id", user_id)
+	# Who set the user ID: "game" (identify()) or "steam" (auto_identify). A
+	# later launch never replaces a user ID that the game set.
+	_cfg.set_value("identity", "user_id_source", source)
 	_save_cfg()
 	_touch()
 	var event := _build("identify", "", {})
@@ -272,17 +381,231 @@ func identify(user_id: String, traits: Dictionary = {}) -> void:
 	flush()
 
 
+## Set traits on this player, with or without a user ID (P-2814). Before
+## identify() the traits belong to this install's anonymous ID; after it, to
+## the user. Values: String, int, float, bool or null (null clears a trait). At
+## most 50 keys and 8 KB of JSON. Like identify(), it waits for consent: calls
+## before consent are merged and sent then. The protected traits email,
+## itch_user_id, stripe_customer_id and paddle_customer_id are not sent (one
+## warning): only a server may set them.
+func traits(values: Dictionary) -> void:
+	if _disabled:
+		return
+	if not _initialized:
+		push_warning("Manalens: call init() first")
+		return
+	var kept := {}
+	var dropped: Array = []
+	for key in values:
+		if PROTECTED_TRAITS.has(String(key)):
+			dropped.append(String(key))
+		else:
+			kept[key] = values[key]
+	if not dropped.is_empty() and not _warned_protected_traits:
+		_warned_protected_traits = true
+		push_warning("Manalens: traits() does not send %s. Only a server with the secret key can set protected traits" % ", ".join(dropped))
+	kept = _fit(_scalars(kept), "traits")
+	if kept.is_empty():
+		if dropped.is_empty():
+			push_warning("Manalens: traits() needs at least one trait")
+		return
+	if not _identity_active:
+		_deferred_traits.merge(kept, true)
+		return
+	_send_traits(kept)
+
+
+func _send_traits(values: Dictionary) -> void:
+	_touch()
+	var event := _build("traits", "", {})
+	event.event["traits"] = values
+	_enqueue(event)
+
+
+## Link the Steam account of this player (P-2815). Manalens checks the ticket
+## with Steam and reads which of your apps the account owns. The player does
+## not sign in. Once per launch, after consent.
+##
+## With no argument the SDK asks GodotSteam for a Web API ticket itself:
+## Steam.getAuthTicketForWebApi("manalens"), then the get_ticket_for_web_api
+## signal. Without the GodotSteam addon or a running Steam client it does
+## nothing. With your own ticket bytes (from GetAuthTicketForWebApi with the
+## identity "manalens"), the SDK sends those. The answer comes in the
+## steam_linked signal. A refused ticket is not sent again; a 429 with
+## Retry-After (60 s or less) is tried once more.
+func link_steam(ticket: PackedByteArray = PackedByteArray()) -> void:
+	if _disabled:
+		return
+	if not _initialized:
+		push_warning("Manalens: call init() first")
+		return
+	if not ticket.is_empty() and (ticket.size() < 16 or ticket.size() > 2048):
+		push_warning("Manalens: link_steam() needs a ticket of 16 to 2048 bytes")
+		return
+	if _link_in_flight:
+		return
+	_steam_link_tries = 0  # A call from the game replaces the steam_link option.
+	if not _identity_active:
+		_steam_link_pending = true if ticket.is_empty() else ticket
+		return
+	if ticket.is_empty():
+		_request_steam_ticket()
+	else:
+		_send_link(ticket.hex_encode())
+
+
+## steam_link = true: once per launch, after consent, when Steam runs. Tried
+## again on the flush timer: the game may start Steam after the SDK.
+func _try_steam_link() -> void:
+	if _steam_link_tries <= 0 or _steam_link_done or not _identity_active or _server_quiet:
+		return
+	_steam_link_tries -= 1
+	if not Engine.has_singleton("Steam"):
+		_steam_link_tries = 0  # No GodotSteam addon: nothing to do.
+		return
+	if _steam_id() == "":
+		return  # Steam is not running yet.
+	_steam_link_tries = 0
+	_request_steam_ticket()
+
+
+func _request_steam_ticket() -> void:
+	if _link_in_flight or not Engine.has_singleton("Steam"):
+		return
+	var steam: Object = Engine.get_singleton("Steam")
+	if steam == null or not steam.has_method("getAuthTicketForWebApi") or not steam.has_signal("get_ticket_for_web_api"):
+		return
+	if steam.has_method("isSteamRunning") and not bool(steam.call("isSteamRunning")):
+		return
+	_steam_link_done = true
+	_link_in_flight = true
+	if not steam.is_connected("get_ticket_for_web_api", _on_steam_ticket):
+		steam.connect("get_ticket_for_web_api", _on_steam_ticket)
+	_steam_ticket_handle = int(steam.call("getAuthTicketForWebApi", STEAM_TICKET_IDENTITY))
+	if _steam_ticket_handle == 0:
+		steam.disconnect("get_ticket_for_web_api", _on_steam_ticket)
+		_link_finished(false, 0, "STEAM_TICKET")
+
+
+## GodotSteam: get_ticket_for_web_api(auth_ticket, result, ticket_size, ticket_buffer).
+func _on_steam_ticket(auth_ticket: int, result: int, ticket_size: int, ticket_buffer: PackedByteArray) -> void:
+	if auth_ticket != _steam_ticket_handle:
+		return  # A ticket that the game asked for itself.
+	_steam_ticket_handle = 0
+	var steam: Object = Engine.get_singleton("Steam") if Engine.has_singleton("Steam") else null
+	if steam != null and steam.is_connected("get_ticket_for_web_api", _on_steam_ticket):
+		steam.disconnect("get_ticket_for_web_api", _on_steam_ticket)
+	var bytes := ticket_buffer.slice(0, ticket_size) if ticket_size > 0 else ticket_buffer
+	if result != STEAM_RESULT_OK or bytes.size() < 16 or bytes.size() > 2048:
+		if _options.debug:
+			print("Manalens: Steam gave no Web API ticket (result %d)" % result)
+		_link_finished(false, 0, "STEAM_TICKET")
+		return
+	_send_link(bytes.hex_encode())
+
+
+func _send_link(ticket_hex: String) -> void:
+	if not _identity_active or _anonymous_id == "":
+		_link_finished(false, 0, "CONSENT_REQUIRED")
+		return
+	_steam_link_done = true
+	_link_in_flight = true
+	_link_attempt = 0
+	_link_anonymous_id = _anonymous_id
+	_link_body = JSON.stringify({"provider": "steam", "ticket": ticket_hex, "anonymous_id": _anonymous_id})
+	_link_request()
+
+
+func _link_request() -> void:
+	var headers := PackedStringArray(["Content-Type: application/json", "x-publishable-key: %s" % _options.publishable_key])
+	_link_send(_link_url(), headers, _link_body)
+
+
+## The HTTP call of link_steam(). Tests replace it.
+func _link_send(url: String, headers: PackedStringArray, body: String) -> void:
+	if _link_http == null or _link_http.request(url, headers, HTTPClient.METHOD_POST, body) != OK:
+		_on_link_completed(HTTPRequest.RESULT_CANT_CONNECT, 0, PackedStringArray(), PackedByteArray())
+
+
+## Run `callback` after `seconds`. Tests replace it.
+func _link_after(seconds: float, callback: Callable) -> void:
+	get_tree().create_timer(seconds).timeout.connect(callback)
+
+
+func _link_url() -> String:
+	var base := String(_options.api_endpoint).trim_suffix("/")
+	if base == "":
+		base = String(_options.endpoint).trim_suffix("/")
+		var scheme := base.find("://")
+		if scheme >= 0 and base.substr(scheme + 3).begins_with("events."):
+			base = base.left(scheme + 3) + "api." + base.substr(scheme + 3 + "events.".length())
+	return base + "/v0/link"
+
+
+func _on_link_completed(result: int, code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
+	if result != HTTPRequest.RESULT_SUCCESS:
+		_link_finished(false, 0, "NETWORK_ERROR")
+		return
+	if code >= 200 and code < 300:
+		if _options.debug:
+			print("Manalens: Steam account linked")
+		_link_finished(true, code, "")
+		return
+	var wait := _retry_after_seconds(headers)
+	if code == 429 and _link_attempt == 0 and wait >= 0.0 and wait <= LINK_MAX_RETRY_AFTER_S:
+		_link_attempt = 1
+		_link_after(wait, _link_retry)
+		return
+	var error_code := ""
+	var parsed = JSON.parse_string(body.get_string_from_utf8())
+	if typeof(parsed) == TYPE_DICTIONARY and typeof(parsed.get("error")) == TYPE_DICTIONARY:
+		error_code = String(parsed.error.get("code", ""))
+	push_warning("Manalens: link_steam() failed (HTTP %d%s)" % [code, "" if error_code == "" else " " + error_code])
+	_link_finished(false, code, error_code)
+
+
+func _link_finished(linked: bool, status: int, code: String) -> void:
+	_link_in_flight = false
+	steam_linked.emit(linked, status, code)
+
+
+## The one retry after a 429. Only with the same gates as the first send: after
+## set_consent(false), an opt-out or reset() the old ticket and ID are not sent.
+func _link_retry() -> void:
+	if _disabled or not _identity_active or not _identity_allowed():
+		_link_finished(false, 0, "CONSENT_REQUIRED")
+		return
+	if _anonymous_id != _link_anonymous_id:
+		_link_finished(false, 0, "IDENTITY_CHANGED")
+		return
+	_link_request()
+
+
+## Retry-After in seconds (a number of seconds or an HTTP date), or -1 without the header.
+func _retry_after_seconds(headers: PackedStringArray) -> float:
+	for header in headers:
+		var colon := String(header).find(":")
+		if colon > 0 and String(header).substr(0, colon).strip_edges().to_lower() == "retry-after":
+			return _parse_retry_after(headers, _now())
+	return -1.0
+
+
 ## Forget the player: ends the session, clears user_id, makes a new anonymous ID
 ## and starts a new session.
 func reset() -> void:
+	_deferred_traits.clear()
+	_steam_link_pending = null
 	if not _identity_active:
 		_user_id = ""
 		_deferred_identify = null
+		_clear_error_history()
 		return
-	_end_session(_now())
+	_end_session(_now())  # Sends errors_dropped of the old session.
+	_clear_error_history()
 	_user_id = ""
 	_anonymous_id = _uuid()
 	_cfg.set_value("identity", "user_id", "")
+	_cfg.set_value("identity", "user_id_source", "")
 	_cfg.set_value("identity", "anonymous_id", _anonymous_id)
 	_start_session(_now())
 	_save_cfg()
@@ -312,10 +635,12 @@ func set_consent(granted: bool) -> void:
 		return
 	_identity_active = false
 	_deferred_identify = null
+	_deferred_traits.clear()
+	_steam_link_pending = null
 	_anonymous_id = ""
 	_user_id = ""
 	_session_id = ""
-	for key in ["anonymous_id", "user_id", "first_open_at"]:
+	for key in ["anonymous_id", "user_id", "user_id_source", "first_open_at"]:
 		if _cfg.has_section_key("identity", key):
 			_cfg.erase_section_key("identity", key)
 	if _cfg.has_section("session"):
@@ -324,6 +649,15 @@ func set_consent(granted: bool) -> void:
 	_queue.clear()
 	if _store_exists(QUEUE_PATH):
 		_store_remove(QUEUE_PATH)
+	_clear_error_history()
+
+
+## Event names and error counts of the old player must never reach a later error.
+func _clear_error_history() -> void:
+	_breadcrumbs.clear()
+	_error_seen.clear()
+	_error_times.clear()
+	_errors_dropped = 0
 
 
 ## Send queued events now (one batch; the rest follows when it succeeds).
@@ -341,7 +675,8 @@ func flush() -> void:
 	var url := String(_options.endpoint).trim_suffix("/") + "/v0/events"
 	var headers := PackedStringArray(["Content-Type: application/json", "x-publishable-key: %s" % _options.publishable_key])
 	_sending = true
-	var error := _http.request(url, headers, HTTPClient.METHOD_POST, JSON.stringify({"events": batch}))
+	# sent_at: the device clock now. The collector corrects the event times with it, so a wrong clock gives right times (P-2799).
+	var error := _http.request(url, headers, HTTPClient.METHOD_POST, JSON.stringify({"events": batch, "sent_at": _iso(_now())}))
 	if error != OK:
 		_on_request_completed(HTTPRequest.RESULT_CANT_CONNECT, 0, PackedStringArray(), PackedByteArray())
 
@@ -486,7 +821,10 @@ func _process(_delta: float) -> void:
 	_errors_dropped += int(taken[1]) + maxi(0, items.size() - AUTO_ERRORS_PER_FRAME)
 	for item in items.slice(0, AUTO_ERRORS_PER_FRAME):
 		var kind := String(item.kind)
-		_record_error(String(item.message), {
+		# A log line can hold paths, URLs, emails, and tokens: clean it before it
+		# is queued. The fingerprint is computed from the cleaned text, so the
+		# same error on two machines with different user names groups together.
+		_record_error(_clean_log_message(String(item.message), _home_dirs()), {
 			"severity": "warning" if kind == "warning" else "error",
 			"error_type": "engine_warning" if kind == "warning" else ("script_error" if kind == "script" else "engine_error"),
 			"handled": false,
@@ -494,8 +832,8 @@ func _process(_delta: float) -> void:
 			"file": String(item.file),
 			"line": int(item.line),
 			"function": String(item.function),
-			"properties": {"engine_error_type": kind},
-		}, "godot_logger")
+			"properties": {"log_type": kind},
+		}, SOURCE_AUTO)
 
 
 func _on_tick() -> void:
@@ -507,6 +845,8 @@ func _on_tick() -> void:
 	# Only an open one: during shutdown() a tick must not start a new session.
 	if _focused and _session_id != "":
 		_touch()
+	_try_auto_identify()
+	_try_steam_link()
 	_save_session()
 	_save_queue()
 	flush()
@@ -550,25 +890,88 @@ func _start_identity() -> void:
 		# Sentry "abnormal" session). A game the OS closed in the background
 		# is not a crash. On web a closed or reloaded tab has no quit event,
 		# so every relaunch would look like a crash: no crash detection there.
-		if not bool(_cfg.get_value("session", "exited", false)) and bool(_cfg.get_value("session", "focused", true)) and _platform() != "web":
+		if not _server_quiet and not bool(_cfg.get_value("session", "exited", false)) and bool(_cfg.get_value("session", "focused", true)) and _platform() != "web":
 			var crash := {"previous_session_id": previous}
 			for key in ["build", "app_version"]:
 				var value := String(_cfg.get_value("session", key, ""))
 				if value != "":
 					crash["previous_" + key] = value
-			_enqueue(_build("track", "app_unclean_exit", crash, _last_activity_at))
+			_enqueue(_build("track", "app_crash", crash, _last_activity_at))
 		_end_session(_last_activity_at)
 	_start_session(now)
-	_enqueue(_build("track", "game_open", {"is_first_open": first_open, "first_open_at": String(_cfg.get_value("identity", "first_open_at", _iso(now)))}))
+	if not _server_quiet:
+		_enqueue(_build("track", "game_open", {"is_first_open": first_open, "first_open_at": String(_cfg.get_value("identity", "first_open_at", _iso(now)))}))
 	_save_cfg()
-	# Write game_open (the install signal) and app_unclean_exit to disk before
+	# Write game_open (the install signal) and app_crash to disk before
 	# any send: a process killed before the next save would lose them.
 	_save_queue()
 	if _deferred_identify != null:
 		var pending: Array = _deferred_identify
 		_deferred_identify = null
-		identify(pending[0], pending[1])
+		_identify(pending[0], pending[1], "game")
+	if not _deferred_traits.is_empty():
+		var held := _deferred_traits
+		_deferred_traits = {}
+		_send_traits(held)
+	if _steam_link_pending != null:
+		var link = _steam_link_pending
+		_steam_link_pending = null
+		if link is PackedByteArray:
+			_send_link(link.hex_encode())
+		else:
+			_request_steam_ticket()
+	# Next frame: an identify() that the game calls right after init() wins.
+	_try_auto_identify.call_deferred()
+	_try_steam_link.call_deferred()
 	flush()
+
+
+## auto_identify = "steam" (P-2513): identify the player by a salted hash of
+## the SteamID64, once per launch, after consent. Needs the GodotSteam addon
+## (the `Steam` singleton) and a running Steam client; without them it does
+## nothing. Skipped when the game called identify() in this launch, when the
+## saved user ID came from the game, and on a quiet server build.
+func _try_auto_identify() -> void:
+	if _auto_identify_tries <= 0 or _game_identified or not _identity_active or _server_quiet:
+		return
+	_auto_identify_tries -= 1
+	if String(_cfg.get_value("identity", "user_id_source", "game" if _user_id != "" else "")) == "game":
+		_auto_identify_tries = 0
+		return
+	if not Engine.has_singleton("Steam"):
+		_auto_identify_tries = 0  # No GodotSteam addon: nothing to do.
+		return
+	var steam_id := _steam_id()
+	if steam_id == "":
+		return  # Try again on the next tick: the game may start Steam later.
+	_auto_identify_tries = 0
+	_identify(steam_user_id(String(_options.publishable_key), steam_id), {"storefront": "steam"}, "steam")
+
+
+## The SteamID64 of the signed-in Steam user as text, or "" when the GodotSteam
+## addon is missing, Steam is not running, or the ID is 0. Never a hard
+## dependency: the SDK looks the singleton up by name.
+func _steam_id() -> String:
+	if not Engine.has_singleton("Steam"):
+		return ""
+	var steam: Object = Engine.get_singleton("Steam")
+	if steam == null or not steam.has_method("getSteamID"):
+		return ""
+	if steam.has_method("isSteamRunning") and not bool(steam.call("isSteamRunning")):
+		return ""
+	var id = steam.call("getSteamID")
+	if (typeof(id) != TYPE_INT and typeof(id) != TYPE_STRING) or String.num_int64(int(id)) == "0":
+		return ""
+	return String.num_int64(int(id))
+
+
+## The user ID of auto_identify: "steam_" and the SHA-256 (hex) of
+## "<publishable_key>:<SteamID64>". The key is the per-project salt: the same
+## player gets the same ID in one project and a different ID in another. This
+## is pseudonymous, not anonymous: the key ships in the game and SteamIDs are
+## few, so the hash can be reversed by brute force.
+static func steam_user_id(publishable_key: String, steam_id64: String) -> String:
+	return "steam_" + ("%s:%s" % [publishable_key, steam_id64]).sha256_text()
 
 
 func _start_session(at: float) -> void:
@@ -577,7 +980,8 @@ func _start_session(at: float) -> void:
 	_last_activity_at = at
 	_auto_errors = 0
 	_save_session()
-	_enqueue(_build("track", "session_start", {}, at))
+	if not _server_quiet:
+		_enqueue(_build("track", "session_start", {}, at))
 
 
 func _end_session(at: float) -> void:
@@ -588,7 +992,8 @@ func _end_session(at: float) -> void:
 	if _errors_dropped > 0:
 		ended["errors_dropped"] = _errors_dropped
 		_errors_dropped = 0
-	_enqueue(_build("track", "session_end", ended, at))
+	if not _server_quiet:
+		_enqueue(_build("track", "session_end", ended, at))
 	_session_id = ""
 	if _cfg.has_section("session"):
 		_cfg.erase_section("session")
@@ -744,7 +1149,8 @@ func _build(type: String, event: String, properties: Dictionary, at: float = -1.
 
 
 func _context() -> Dictionary:
-	var app := {"platform": _platform(), "engine": "godot"}
+	var platform := String(_options.platform)
+	var app := {"platform": platform if platform != "" else _platform(), "engine": "godot"}
 	for key in ["app_version", "build", "storefront"]:
 		if String(_options[key]) != "":
 			app[key] = String(_options[key])
@@ -762,7 +1168,14 @@ func _context() -> Dictionary:
 	return context
 
 
-func _enqueue(entry: Dictionary) -> void:
+## Queues an event after before_send. Returns false when before_send dropped it.
+func _enqueue(entry: Dictionary) -> bool:
+	var envelope = _apply_before_send(entry.event)
+	if envelope == null:
+		if _options.debug:
+			print("Manalens: before_send dropped %s %s" % [entry.event.type, entry.event.get("event", "")])
+		return false
+	entry.event = envelope
 	var name := String(entry.event.get("event", ""))
 	if entry.event.type == "track" and name != "error":
 		_breadcrumbs.append(name)
@@ -779,6 +1192,59 @@ func _enqueue(entry: Dictionary) -> void:
 	if _queue.size() >= int(_options.flush_at):
 		_save_queue()
 		flush()
+	return true
+
+
+## Runs before_send on a copy of the envelope. Returns the envelope to queue,
+## or null to drop it.
+func _apply_before_send(envelope: Dictionary) -> Variant:
+	if not _before_send.is_valid():
+		return envelope
+	if _in_before_send:
+		push_warning("Manalens: an event recorded inside before_send is dropped")
+		return null
+	_in_before_send = true
+	var changed = _before_send.call(envelope.duplicate(true))
+	_in_before_send = false
+	if changed == null:
+		return null
+	if typeof(changed) != TYPE_DICTIONARY:
+		push_warning("Manalens: before_send must return a Dictionary or null; event dropped")
+		return null
+	var out := envelope.duplicate()
+	var ok := true
+	for key in ["type", "message_id", "anonymous_id", "session_id"]:
+		if envelope.has(key) != changed.has(key) or (envelope.has(key) and str(changed[key]) != str(envelope[key])):
+			ok = false
+	var context = changed.get("context")
+	if typeof(context) != TYPE_DICTIONARY or typeof(context.get("app")) != TYPE_DICTIONARY or context.app != envelope.context.app:
+		ok = false
+	if envelope.has("event"):
+		var name = changed.get("event")
+		if (typeof(name) != TYPE_STRING and typeof(name) != TYPE_STRING_NAME) or String(name).length() < 1 or String(name).length() > 128:
+			ok = false
+		else:
+			out["event"] = String(name)
+	for field in ["properties", "traits"]:
+		if envelope.has(field):
+			if typeof(changed.get(field, {})) != TYPE_DICTIONARY:
+				ok = false
+			else:
+				out[field] = _fit(_scalars(changed.get(field, {})), field)
+	var user = changed.get("user_id")
+	var user_is_text := typeof(user) == TYPE_STRING or typeof(user) == TYPE_STRING_NAME
+	if user == null or (user_is_text and String(user) == ""):
+		out.erase("user_id")
+	elif user_is_text and String(user).length() <= 255:
+		out["user_id"] = String(user)
+	else:
+		ok = false
+	if envelope.type == "identify" and not out.has("user_id"):
+		ok = false
+	if not ok:
+		push_warning("Manalens: before_send changed or removed type, message_id, anonymous_id, session_id, context.app, or gave a wrong event, properties, traits or user_id; the original event is sent")
+		return envelope
+	return out
 
 
 ## Drop events the collector would refuse as more than 7 days old.
@@ -831,7 +1297,56 @@ func _refused_in_accepted(body: PackedByteArray) -> Dictionary:
 	return {"count": int(parsed.rejected), "reason": ", ".join(PackedStringArray(codes.keys()))}
 
 
-func _on_request_completed(result: int, code: int, _headers: PackedStringArray, _body: PackedByteArray) -> void:
+## The wait in seconds that the Retry-After header of a response asks for: an
+## integer number of seconds, or an HTTP date (then the time until that date).
+## A missing or invalid value, or a date in the past, gives 0. Not capped:
+## _retry_wait() applies MAX_RETRY_AFTER_S.
+func _parse_retry_after(headers: PackedStringArray, now: float) -> float:
+	var value := ""
+	var found := false
+	for line in headers:
+		var colon := line.find(":")
+		if colon > 0 and line.substr(0, colon).strip_edges().to_lower() == "retry-after":
+			value = line.substr(colon + 1).strip_edges()
+			found = true
+			break
+	if not found or value == "":
+		return 0.0
+	var digits := true
+	for c in value:
+		if c < "0" or c > "9":
+			digits = false
+			break
+	if digits:
+		return value.to_float()
+	# An HTTP date: "Wed, 21 Oct 2026 07:28:00 GMT".
+	var parts := value.replace(",", " ").split(" ", false)
+	if parts.size() != 6 or parts[5].to_upper() != "GMT":
+		return 0.0
+	var month := HTTP_MONTHS.find(parts[2].to_lower())
+	var clock := parts[4].split(":")
+	if month < 0 or not parts[1].is_valid_int() or not parts[3].is_valid_int() or clock.size() != 3:
+		return 0.0
+	for piece in clock:
+		if not piece.is_valid_int():
+			return 0.0
+	var day := int(parts[1])
+	var hour := int(clock[0])
+	var minute := int(clock[1])
+	var second := int(clock[2])
+	if day < 1 or day > 31 or hour < 0 or hour > 23 or minute < 0 or minute > 59 or second < 0 or second > 60:
+		return 0.0
+	var at := Time.get_unix_time_from_datetime_dict({"year": int(parts[3]), "month": month + 1, "day": day, "hour": hour, "minute": minute, "second": second})
+	return maxf(0.0, float(at) - now)
+
+
+## The wait before the next try after a retried response: the backoff with
+## jitter, or the Retry-After of the response when it is longer (at most 1 hour).
+func _retry_wait(backoff: float, headers: PackedStringArray, now: float) -> float:
+	return maxf(backoff, minf(MAX_RETRY_AFTER_S, _parse_retry_after(headers, now)))
+
+
+func _on_request_completed(result: int, code: int, headers: PackedStringArray, _body: PackedByteArray) -> void:
 	var count := _in_flight.size()
 	var ok := result == HTTPRequest.RESULT_SUCCESS and code >= 200 and code < 300
 	# A 4xx other than 408 and 429 will fail again: drop the batch (as the
@@ -862,9 +1377,11 @@ func _on_request_completed(result: int, code: int, _headers: PackedStringArray, 
 	else:
 		_failures += 1
 		var delay := minf(MAX_BACKOFF_S, pow(2.0, float(_failures)))
-		_backoff_until = _now() + delay * randf_range(0.5, 1.0)
+		# Wait at least what the collector asks for (Retry-After on a 429 or 503), at most 1 hour.
+		var wait := _retry_wait(delay * randf_range(0.5, 1.0), headers, _now())
+		_backoff_until = _now() + wait
 		if _options.debug:
-			print("Manalens: send failed (result %d, HTTP %d); retry in %.0f s" % [result, code, delay])
+			print("Manalens: send failed (result %d, HTTP %d); retry in %.0f s" % [result, code, wait])
 	_in_flight.clear()
 	_sending = false
 	_save_queue()
@@ -922,7 +1439,7 @@ func _install_error_logger() -> void:
 
 func _record_error(message: String, options: Dictionary, source: String) -> void:
 	if not _initialized or not _identity_active:
-		if source == "manual":
+		if source == SOURCE_MANUAL:
 			_ready_to_record()  # Warns before init().
 		return
 	var severity := String(options.get("severity", "error"))
@@ -957,18 +1474,12 @@ func _record_error(message: String, options: Dictionary, source: String) -> void
 	if not _error_allowed(String(props.fingerprint), source):
 		_errors_dropped += 1
 		return
-	if _before_send.is_valid():
-		var changed = _before_send.call(props)
-		if changed == null:
-			return
-		if typeof(changed) != TYPE_DICTIONARY:
-			push_warning("Manalens: before_send must return a Dictionary or null; error dropped")
-			return
-		props = _scalars(changed)
-	if source != "manual":
-		_auto_errors += 1
 	_touch()
-	_enqueue(_build("track", "error", props))
+	# before_send runs in _enqueue, after the fingerprint and the limits.
+	if not _enqueue(_build("track", "error", props)):
+		return
+	if source == SOURCE_AUTO:
+		_auto_errors += 1
 	# Keep the error on disk now: a crash can follow it.
 	_save_queue()
 
@@ -981,7 +1492,7 @@ func _error_allowed(fingerprint: String, source: String) -> bool:
 	_error_times = _error_times.filter(func(at): return now - int(at) < ERROR_WINDOW_MS)
 	if _error_times.size() >= ERROR_WINDOW_MAX:
 		return false
-	if source != "manual" and _auto_errors >= int(_options.max_auto_errors_per_session):
+	if source == SOURCE_AUTO and _auto_errors >= int(_options.max_auto_errors_per_session):
 		return false
 	_error_seen[fingerprint] = now
 	_error_times.append(now)
@@ -1000,6 +1511,259 @@ func _fingerprint(error_type: String, message: String, file: String, function: S
 	else:
 		basis = "%s|%s" % [error_type, _number_re.sub(_quoted_re.sub(message, "?", true), "N", true)]
 	return basis.sha1_text().left(16)
+
+
+# Cleaning of captured engine messages (the rules of the Unreal plugin) --------
+
+## The player's home folder, as the OS names it. Paths under it become ~.
+func _home_dirs() -> Array:
+	var dirs := []
+	for name in ["HOME", "USERPROFILE"]:
+		var value := OS.get_environment(name)
+		if value != "":
+			dirs.append(value)
+	return dirs
+
+
+## Removes personal data from an engine log message: the home folder and
+## /Users/<name>, /home/<name>, X:\Users\<name> become ~; URLs lose their
+## user, query, and fragment; emails become [email]; the values after key=,
+## token=, secret=, password=, authorization: and bearer, and runs of 24 or
+## more letters, digits, _ and - become [redacted]. track_error() text is not
+## changed.
+func _clean_log_message(message: String, home_dirs: Array) -> String:
+	var text := message
+	for dir in home_dirs:
+		text = _clean_dir(text, String(dir))
+	text = _clean_home_patterns(text)
+	text = _clean_urls(text)
+	text = _clean_emails(text)
+	text = _clean_key_values(text)
+	return _clean_long_tokens(text)
+
+
+static func _is_alnum(c: int) -> bool:
+	return (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or (c >= 48 and c <= 57)
+
+
+static func _is_separator(c: int) -> bool:
+	return c == 47 or c == 92  # / and \
+
+
+static func _is_token_char(c: int) -> bool:
+	return _is_alnum(c) or c == 95 or c == 45  # _ and -
+
+
+## Whitespace, quotes, < > ( ): the end of a path, URL, or value.
+static func _is_end(c: int) -> bool:
+	return c in [32, 9, 10, 11, 12, 13, 34, 39, 60, 62, 40, 41]
+
+
+static func _is_email_local(c: int) -> bool:
+	return _is_alnum(c) or c in [46, 95, 37, 43, 45]  # . _ % + -
+
+
+static func _is_email_domain(c: int) -> bool:
+	return _is_alnum(c) or c == 46 or c == 45
+
+
+## Each occurrence of a directory (and so the path under it) becomes ~.
+func _clean_dir(text: String, dir: String) -> String:
+	dir = dir.replace("\\", "/")
+	while dir.length() > 0 and _is_separator(dir.unicode_at(dir.length() - 1)):
+		dir = dir.left(-1)
+	if dir.length() < 3:
+		return text
+	for form in [dir, dir.replace("/", "\\")]:
+		var from := 0
+		while true:
+			var at := text.findn(form, from)
+			if at < 0:
+				break
+			var end: int = at + form.length()
+			if end < text.length() and not _is_separator(text.unicode_at(end)) and not _is_end(text.unicode_at(end)):
+				from = end  # A longer name, for example /Users/annabel for /Users/anna.
+				continue
+			text = text.left(at) + "~" + text.substr(end)
+			from = at + 1
+	return text
+
+
+## /Users/<name>, /home/<name>, and X:\Users\<name> become ~.
+func _clean_home_patterns(text: String) -> String:
+	var out := PackedStringArray()
+	var index := 0
+	var start := 0
+	while index < text.length():
+		var name_at := -1
+		var rest := text.substr(index, 9).to_lower()
+		var boundary := index == 0 or not (_is_alnum(text.unicode_at(index - 1)) or text.unicode_at(index - 1) == 95)
+		if rest.begins_with("/users/"):
+			name_at = index + 7
+		elif rest.begins_with("/home/"):
+			name_at = index + 6
+		elif boundary and rest.length() == 9 and rest.unicode_at(0) >= 97 and rest.unicode_at(0) <= 122 and rest.unicode_at(1) == 58 \
+				and _is_separator(rest.unicode_at(2)) and rest.substr(3, 5) == "users" and _is_separator(rest.unicode_at(8)):
+			name_at = index + 9
+		if name_at >= 0:
+			var end := name_at
+			while end < text.length() and not _is_separator(text.unicode_at(end)) and not _is_end(text.unicode_at(end)):
+				end += 1
+			if end > name_at:
+				out.append(text.substr(start, index - start))
+				out.append("~")
+				index = end
+				start = end
+				continue
+		index += 1
+	out.append(text.substr(start))
+	return "".join(out)
+
+
+## scheme://user:pass@host/path?query#fragment becomes scheme://host/path.
+func _clean_urls(text: String) -> String:
+	var from := 0
+	while true:
+		var at := text.find("://", from)
+		if at < 0:
+			break
+		var end := at + 3
+		while end < text.length() and not _is_end(text.unicode_at(end)):
+			end += 1
+		var rest := text.substr(at + 3, end - at - 3)
+		for index in rest.length():
+			if rest.unicode_at(index) == 63 or rest.unicode_at(index) == 35:  # ? and #
+				rest = rest.left(index)
+				break
+		var slash := rest.find("/")
+		var authority := rest if slash < 0 else rest.left(slash)
+		var path := "" if slash < 0 else rest.substr(slash)
+		var at_sign := authority.rfind("@")
+		if at_sign >= 0:
+			authority = authority.substr(at_sign + 1)
+		var clean := authority + path
+		text = text.left(at + 3) + clean + text.substr(end)
+		from = at + 3 + clean.length()
+	return text
+
+
+func _clean_emails(text: String) -> String:
+	var at := 0
+	while at < text.length():
+		if text.unicode_at(at) == 64:  # @
+			var start := at
+			while start > 0 and _is_email_local(text.unicode_at(start - 1)):
+				start -= 1
+			var end := at + 1
+			while end < text.length() and _is_email_domain(text.unicode_at(end)):
+				end += 1
+			while end > at + 1 and (text.unicode_at(end - 1) == 46 or text.unicode_at(end - 1) == 45):
+				end -= 1  # A full stop after the address.
+			if start < at and text.substr(at + 1, end - at - 1).contains("."):
+				text = text.left(start) + "[email]" + text.substr(end)
+				at = start + 6
+		at += 1
+	return text
+
+
+## The value after key, token, secret, password, or authorization with = or :
+## (also the JSON form "token": "...") and after bearer. A quoted value is
+## redacted up to its closing quote.
+func _clean_key_values(text: String) -> String:
+	const REDACTED := "[redacted]"
+	# bearer first, so "token: Bearer abc" loses both words.
+	for name in ["bearer", "authorization", "key", "token", "secret", "password"]:
+		var from := 0
+		while true:
+			var at := text.findn(name, from)
+			if at < 0:
+				break
+			var start: int = at + name.length()
+			if name == "bearer":
+				if start >= text.length() or text.unicode_at(start) != 32:
+					from = at + 1
+					continue
+			else:
+				if start < text.length() and text.unicode_at(start) in [34, 39]:
+					start += 1  # the closing quote of a JSON key
+				while start < text.length() and text.unicode_at(start) == 32:
+					start += 1
+				if start >= text.length() or not (text.unicode_at(start) in [58, 61]):  # : and =
+					from = at + 1
+					continue
+				start += 1
+			while start < text.length() and text.unicode_at(start) == 32:
+				start += 1
+			var end := start
+			if start < text.length() and text.unicode_at(start) in [34, 39]:
+				# A quoted value: up to the closing quote (or the end of the text).
+				var quote := text.substr(start, 1)
+				start += 1
+				end = text.find(quote, start)
+				if end < 0:
+					end = text.length()
+			elif name == "authorization":
+				# Authorization: <scheme> <credentials>, to the end of the line.
+				while end < text.length() and not (text.unicode_at(end) in [10, 13, 34, 39]):
+					end += 1
+			else:
+				while end < text.length() and not _is_end(text.unicode_at(end)) and not (text.unicode_at(end) in [38, 44, 59, 93, 125]):  # & , ; ] }
+					end += 1
+			if end > start and text.substr(start, end - start) != REDACTED:
+				text = text.left(start) + REDACTED + text.substr(end)
+				end = start + REDACTED.length()
+			from = maxi(end, at + 1)
+	return text
+
+
+static func _is_base64_char(c: int) -> bool:
+	return _is_token_char(c) or c == 43 or c == 47 or c == 61  # + / =
+
+
+## Keys, tokens, and IDs: a JWT (eyJ... with two dots), a base64 run of 24 or
+## more characters with + or a trailing =, and runs of 24 or more characters
+## from A-Z, a-z, 0-9, _, and -. File paths (with / but no + or =) stay.
+func _clean_long_tokens(text: String) -> String:
+	var out := PackedStringArray()
+	var index := 0
+	var start := 0
+	while index < text.length():
+		var end := index
+		while end < text.length() and _is_token_char(text.unicode_at(end)):
+			end += 1
+		var redact_to := -1
+		if text.substr(index, 3) == "eyJ":
+			var jwt_end := index
+			var dots := 0
+			while jwt_end < text.length() and (_is_token_char(text.unicode_at(jwt_end)) or text.unicode_at(jwt_end) == 46):
+				if text.unicode_at(jwt_end) == 46:
+					dots += 1
+				jwt_end += 1
+			while jwt_end > index and text.unicode_at(jwt_end - 1) == 46:
+				jwt_end -= 1  # a full stop after the token
+				dots -= 1
+			if dots >= 2:
+				redact_to = jwt_end
+		if redact_to < 0:
+			var b64_end := index
+			while b64_end < text.length() and _is_base64_char(text.unicode_at(b64_end)):
+				b64_end += 1
+			var run := text.substr(index, b64_end - index)
+			if run.length() >= 24 and (run.contains("+") or run.ends_with("=")):
+				redact_to = b64_end
+		if redact_to < 0 and end - index >= 24:
+			redact_to = end
+		if redact_to >= 0:
+			out.append(text.substr(start, index - start))
+			out.append("[redacted]")
+			start = redact_to
+			index = redact_to
+		elif end > index:
+			index = end
+		else:
+			index += 1
+	out.append(text.substr(start))
+	return "".join(out)
 
 
 # Helpers ---------------------------------------------------------------------

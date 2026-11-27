@@ -14,13 +14,13 @@
       - data-endpoint: the collector URL, without /v0/events.
 
       serve.mjs fills in the two %...% values from .env. On your own site,
-      write the values in the tag. When the package is on npm, use
-      the pinned jsDelivr URL and its hash from the release notes instead of
-      /snippet.global.js. See README.md.
+      write the values in the tag. To load the SDK from the Manalens CDN, use
+      https://cdn.manalens.dev/web@0.4.0 instead of /snippet.global.js. The
+      hash is the same; it is also in the release notes. See README.md.
     -->
     <script
       src="/snippet.global.js"
-      integrity="sha384-Km4VIwmATqpPQJRiA1+Z6PUQbIp7zcB6DFoHwDkCG17lflazgfd5fmNDletUxhnH"
+      integrity="sha384-6NHDgHrSAx9IB6oBb3iNn2sBrGvTn9Kp5WgXXdXYLbKVqEuK2RxvQqPQRaq1KeUE"
       crossorigin="anonymous"
       data-publishable-key="%MANALENS_PUBLISHABLE_KEY%"
       data-endpoint="%MANALENS_ENDPOINT%"

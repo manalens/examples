@@ -10,8 +10,8 @@ dependencies. Copy the folder that is nearest to your stack.
 | [with-html](./with-html) | Web SDK (script tag) | Publishable key | The snippet with `data-publishable-key`, `data-endpoint` and Subresource Integrity, a custom event button |
 | [with-astro](./with-astro) | Web SDK (script tag) | Publishable key | An Astro site: the snippet in the base layout with SRI, one page view per View Transitions navigation, `wishlist_clicked`, `identify()` after a newsletter form |
 | [with-react](./with-react) | Web SDK (npm) | Publishable key | A React + React Router site with Vite: one page view per navigation, `wishlist_clicked`, `identify()` and `reset()` |
-| [with-threejs](./with-threejs) | Web SDK (npm) | Publishable key | A three.js browser game with the `app` option and the game events: `game_open`, `session_start`, `session_end`, `level_*`, `error`, including a lost WebGL context |
-| [with-electron](./with-electron) | Web SDK + Node SDK (app mode) | Publishable key | Renderer and main process with one anonymous ID, `app_unclean_exit` with a running flag |
+| [with-threejs](./with-threejs) | Web SDK (npm) | Publishable key | A three.js browser game with the `app` option and game mode (`game_open`, `session_start`, `session_end`, `error`), `level_*` events, and `trackError()` for a lost WebGL context |
+| [with-electron](./with-electron) | Web SDK + Node SDK (app mode) | Publishable key | Renderer and main process with one anonymous ID, `app_crash` with a running flag |
 | [with-godot](./with-godot) | Godot SDK | Publishable key | A Godot 4 project with `publishable_key`, level events, `track_error()`, `link_url()` |
 | [with-unity](./with-unity) | Unity SDK | Publishable key | A Unity project with `PublishableKey`, level events, `TrackError()`, `Identify()`, `LinkUrl()` |
 | [with-unreal](./with-unreal) | Unreal plugin | Publishable key | An Unreal Engine 5 C++ project with the plugin: `SetConsent()`, `Identify()`, level events with `Track()`, `TrackError()`, and one Blueprint path |
@@ -48,42 +48,29 @@ or `<name>.localhost` and open the page on that host. Chromium sends every
 
 ## How the examples get the SDKs
 
-The packages are not on npm yet. Until they are:
+Every example uses the latest release of its SDK:
 
-- `@manalens/web` and `@manalens/node` come from built
-  tarballs in [vendor/](./vendor). Each example depends on them with a
-  `file:` path, for example
-  `"@manalens/web": "file:../vendor/manalens-web-0.1.0.tgz"`.
-  This works offline and in CI. The source commits are in
-  [vendor/README.md](./vendor/README.md).
-- The Unity package `dev.manalens.sdk` comes from a tarball in
-  [vendor/](./vendor). `with-unity/Packages/manifest.json` installs it with a
-  `file:` path.
-- The Godot example has a copy of the addon in `with-godot/addons/`.
-- The Unreal plugin is not in this repository. `with-unreal/get-plugin.sh`
-  downloads release `v0.1.2` into `with-unreal/Plugins/Manalens`.
+| SDK | Version | Used by | How |
+| --- | --- | --- | --- |
+| [`@manalens/web`](https://www.npmjs.com/package/@manalens/web) | 0.4.0 | with-next, with-html, with-astro, with-react, with-threejs, with-electron, with-stripe, with-paddle | npm, `"@manalens/web": "^0.4.0"` |
+| [`@manalens/node`](https://www.npmjs.com/package/@manalens/node) | 0.2.0 | with-express-server, with-electron | npm, `"@manalens/node": "^0.2.0"` |
+| [Godot addon](https://github.com/manalens/manalens-godot) | 0.4.0 | with-godot | A copy of `addons/manalens` from tag `v0.4.0` |
+| [Unity package](https://github.com/manalens/manalens-unity) `dev.manalens.sdk` | 0.3.0 | with-unity | Git URL in `Packages/manifest.json`, `https://github.com/manalens/manalens-unity.git#v0.3.0` |
+| [Unreal plugin](https://github.com/manalens/manalens-unreal) | 0.3.0 | with-unreal | `with-unreal/get-plugin.sh` downloads tag `v0.3.0` into `with-unreal/Plugins/Manalens` |
 
-To use an SDK in your own project now, install it from its public GitHub
-repository (MIT):
+The web and Node SDK source is in
+[manalens-js](https://github.com/manalens/manalens-js). All SDKs are MIT.
 
-- Web SDK: [manalens-js](https://github.com/manalens/manalens-js).
+To use an SDK in your own project:
 
-  ```bash
-  pnpm add github:manalens/manalens-js
-  ```
-
-- Godot: [manalens-godot](https://github.com/manalens/manalens-godot). Copy
-  `addons/manalens` into your project.
-- Unity: [manalens-unity](https://github.com/manalens/manalens-unity). In the
-  Package Manager, add the git URL
-  `https://github.com/manalens/manalens-unity.git#v0.1.3`.
-- Unreal: [manalens-unreal](https://github.com/manalens/manalens-unreal).
-  Copy the `Manalens` folder into `Plugins/`.
-- The Node SDK is not public yet: copy the tarball from [vendor/](./vendor).
-
-TODO: when the packages are on npm, change each `file:` dependency to
-a version range (for example `"@manalens/web": "^0.1.0"`), run
-`pnpm install`, and delete `vendor/`.
+- Web SDK: `pnpm add @manalens/web`, or the CDN tag from the
+  [release notes](https://github.com/manalens/manalens-js/releases) (see
+  [with-html](./with-html)).
+- Node SDK: `pnpm add @manalens/node`.
+- Godot: copy `addons/manalens` of a release into your project.
+- Unity: in the Package Manager, add the git URL
+  `https://github.com/manalens/manalens-unity.git#v0.3.0`.
+- Unreal: copy the `Manalens` folder of a release into `Plugins/`.
 
 ## Smoke test
 
@@ -102,7 +89,7 @@ pnpm smoke
 | Check | What it runs |
 | --- | --- |
 | `express` | The Express app with a server-mode client: `checkout_started` (with IP and user agent) and `purchase` |
-| `electron-main` | The Electron main-process module in Node.js: `app_unclean_exit`, `app_started`, `app_quit` |
+| `electron-main` | The Electron main-process module in Node.js: `app_crash`, `app_started`, `app_quit` |
 | `godot` | The Godot project headless (`-- --demo`). Skipped without Godot; set `GODOT` to the binary |
 | `unity` | Builds a desktop player of the Unity project, then runs it in batch mode (`--demo`). Skipped without Unity; set `UNITY` to the Editor binary |
 | `unreal` | Runs the Unreal project with the plugin and `-ManalensDemo`. Skipped without Unreal; set `UNREAL_EDITOR` to `UnrealEditor-Cmd` (the project must be built) or `UNREAL_GAME` to a packaged game |

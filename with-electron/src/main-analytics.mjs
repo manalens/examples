@@ -7,7 +7,9 @@
 //   the SDK refuses one in app mode, and anyone who has the app can read it.
 // - The same anonymous ID as the renderer's web SDK, so the main process and
 //   the renderer count as one player.
-// - app_unclean_exit: a "running" flag file that a normal quit removes.
+// - app_crash: a "running" flag file that a normal quit removes. The Godot,
+//   Unity and Unreal SDKs send this event for you; in Electron, the main
+//   process sends it.
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Manalens } from '@manalens/node';
@@ -47,13 +49,13 @@ export class MainAnalytics {
 
   /**
    * Start with the renderer's anonymous ID (sent over IPC). Sends
-   * app_unclean_exit when the last run did not quit normally, then
+   * app_crash when the last run did not quit normally, then
    * app_started, and sets the running flag for this run.
    * @param {string} anonymousId
-   * @returns {{ sessionId: string | undefined, uncleanExit: boolean }}
+   * @returns {{ sessionId: string | undefined, crashed: boolean }}
    */
   start(anonymousId) {
-    if (this.client) return { sessionId: this.client.getSessionId(), uncleanExit: false };
+    if (this.client) return { sessionId: this.client.getSessionId(), crashed: false };
     const { publishableKey, endpoint, app, debug, fetch } = this.options;
     this.client = new Manalens(publishableKey, {
       endpoint,
@@ -66,18 +68,22 @@ export class MainAnalytics {
     const previous = readFlag(this.flagPath);
     if (previous) {
       this.client.track({
-        event: 'app_unclean_exit',
-        properties: { previous_session_id: previous.session_id ?? null, previous_build: previous.build ?? null },
+        event: 'app_crash',
+        properties: {
+          previous_session_id: previous.session_id ?? null,
+          previous_build: previous.build ?? null,
+          previous_app_version: previous.app_version ?? null,
+        },
       });
     }
     this.client.track({ event: 'app_started' });
     // The SDK makes the session ID with the first event.
     const sessionId = this.client.getSessionId();
     mkdirSync(this.options.userDataDir, { recursive: true });
-    writeFileSync(this.flagPath, JSON.stringify({ session_id: sessionId ?? null, build: app.build ?? null, started_at: new Date().toISOString() }));
+    writeFileSync(this.flagPath, JSON.stringify({ session_id: sessionId ?? null, build: app.build ?? null, app_version: app.app_version ?? null, started_at: new Date().toISOString() }));
     // Send now, so that a crash soon after start does not lose these events.
     void this.client.flush();
-    return { sessionId, uncleanExit: Boolean(previous) };
+    return { sessionId, crashed: Boolean(previous) };
   }
 
   /**
@@ -105,7 +111,7 @@ export class MainAnalytics {
 
 /**
  * @param {string} path
- * @returns {{ session_id?: string, build?: string } | undefined}
+ * @returns {{ session_id?: string, build?: string, app_version?: string } | undefined}
  */
 function readFlag(path) {
   if (!existsSync(path)) return undefined;

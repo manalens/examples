@@ -3,11 +3,13 @@
 // on the paddle fail it. Each level is faster.
 //
 // Analytics: the web SDK with the `app` option (platform web, engine other,
-// app_version, build). Every event is a web event that also carries
-// context.app, so the App filters and breakdowns work for the game.
+// app_version, build) and game mode. Every event is a web event that also
+// carries context.app, so the App filters and breakdowns work for the game.
+// Game mode sends game_open, session_start, session_end and an error event
+// for each uncaught error or unhandled rejection. The game sends the level
+// events with track() and handled errors with trackError().
 import * as THREE from 'three';
-import { createAnalytics } from '@manalens/web';
-import { GameAnalytics, type Tracker } from './game-analytics';
+import { createAnalytics, type TrackErrorOptions } from '@manalens/web';
 
 declare const __APP_VERSION__: string;
 
@@ -28,12 +30,20 @@ const analytics = publishableKey && endpoint
         // `pnpm dev` runs are tagged "dev", so you can filter them out.
         build: (import.meta.env.VITE_MANALENS_BUILD as string | undefined) || (import.meta.env.DEV ? 'dev' : '1'),
       },
+      game: true,
     })
   : undefined;
 if (!analytics) console.warn('Set VITE_MANALENS_PUBLISHABLE_KEY and VITE_MANALENS_ENDPOINT in .env. No events are sent.');
-const tracker: Tracker = analytics ?? { track() {}, flush: async () => {} };
-const game = new GameAnalytics(tracker);
-game.open();
+
+// Game events with the names and properties of the event conventions.
+const game = {
+  levelStart: (level: number, attempt: number) => analytics?.track('level_start', { level, attempt }),
+  levelComplete: (level: number, attempt: number, score: number) => analytics?.track('level_complete', { level, attempt, score }),
+  levelFail: (level: number, attempt: number, score: number) => analytics?.track('level_fail', { level, attempt, score }),
+  // A handled error: source "manual". Keep personal data out of the message.
+  error: (error: unknown, options?: TrackErrorOptions) => analytics?.trackError(error, options),
+  flush: () => void analytics?.flush(),
+};
 
 const levelLabel = document.getElementById('level')!;
 const scoreLabel = document.getElementById('score')!;
@@ -48,7 +58,7 @@ try {
   renderer = new THREE.WebGLRenderer({ antialias: true });
 } catch (error) {
   // No WebGL (an old GPU, or a headless browser without it).
-  game.error(error, { handled: true, error_type: 'WebGLUnavailable', severity: 'critical' });
+  game.error(error, { errorType: 'WebGLUnavailable', severity: 'critical' });
   message.textContent = 'WebGL is not available in this browser.';
   if (demo) runDemoWithoutRendering();
   throw error;
@@ -121,14 +131,12 @@ function spawn(): void {
 
 window.addEventListener('keydown', event => {
   keys.add(event.key);
-  game.activity();
   // E reports a handled error, to see error events in the dashboard.
-  if (event.key === 'e') game.error(new Error('Example handled error'), { handled: true });
+  if (event.key === 'e') game.error(new Error('Example handled error'));
 });
 window.addEventListener('keyup', event => keys.delete(event.key));
 window.addEventListener('pointermove', event => {
   paddle.position.x = (event.clientX / window.innerWidth - 0.5) * 12;
-  game.activity();
 });
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -143,8 +151,8 @@ window.addEventListener('resize', () => {
 renderer.domElement.addEventListener('webglcontextlost', () => {
   paused = true;
   message.textContent = 'Graphics paused. Waiting for the GPU.';
-  game.error(new Error('WebGL context lost'), { handled: true, error_type: 'WebGLContextLost', severity: 'critical' });
-  void tracker.flush();
+  game.error(new Error('WebGL context lost'), { errorType: 'WebGLContextLost', severity: 'critical' });
+  game.flush();
 });
 renderer.domElement.addEventListener('webglcontextrestored', () => {
   message.textContent = '';
@@ -188,8 +196,8 @@ function runDemo(): void {
   setTimeout(() => { caught = 5; score += 500; endLevel(true); }, 300);
   setTimeout(() => { hits = 3; endLevel(false); }, 800);
   setTimeout(() => {
-    game.error(new Error('Demo handled error'), { handled: true, error_type: 'DemoError' });
-    void tracker.flush();
+    game.error(new Error('Demo handled error'), { errorType: 'DemoError' });
+    game.flush();
     document.title = 'demo done';
   }, 1200);
 }
@@ -199,6 +207,6 @@ function runDemoWithoutRendering(): void {
   game.levelComplete(1, 1, 500);
   game.levelStart(2, 1);
   game.levelFail(2, 1, 0);
-  void tracker.flush();
+  game.flush();
   document.title = 'demo done';
 }

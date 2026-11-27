@@ -15,9 +15,9 @@ export const MANALENS_ENDPOINT: string = import.meta.env.PUBLIC_MANALENS_ENDPOIN
  * the file from the installed package to public/, and fails when its hash is
  * not this value. Change the file and the hash together.
  *
- * TODO: when the package is on npm, use the pinned jsDelivr URL
- * (https://cdn.jsdelivr.net/npm/@manalens/web@0.1.0/dist/snippet.global.js)
- * and the hash from the release notes.
+ * To load the SDK from the Manalens CDN instead, set the src to
+ * https://cdn.manalens.dev/web@0.4.0. The hash is the same; it is also in the
+ * release notes of web-v0.4.0.
  */
 export const MANALENS_SNIPPET_SRC = '/snippet.global.js';
-export const MANALENS_SNIPPET_INTEGRITY = 'sha384-Km4VIwmATqpPQJRiA1+Z6PUQbIp7zcB6DFoHwDkCG17lflazgfd5fmNDletUxhnH';
+export const MANALENS_SNIPPET_INTEGRITY = 'sha384-6NHDgHrSAx9IB6oBb3iNn2sBrGvTn9Kp5WgXXdXYLbKVqEuK2RxvQqPQRaq1KeUE';
