@@ -1,3 +1,6 @@
 allowBuilds:
   sharp: false
   unrs-resolver: false
+# Our own packages are published by trusted publishing; the 1-day age rule applies to all others.
+minimumReleaseAgeExclude:
+  - "@manalens/*"

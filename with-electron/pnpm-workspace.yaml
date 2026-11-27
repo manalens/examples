@@ -1,3 +1,6 @@
 # Electron downloads its binary in a postinstall script.
 allowBuilds:
   electron: true
+# Our own packages are published by trusted publishing; the 1-day age rule applies to all others.
+minimumReleaseAgeExclude:
+  - "@manalens/*"
