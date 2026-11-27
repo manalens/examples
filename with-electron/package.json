@@ -10,8 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@manalens/node": "^0.2.0",
-    "@manalens/web": "^0.4.0"
+    "@manalens/node": "^0.2.1",
+    "@manalens/web": "^0.5.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

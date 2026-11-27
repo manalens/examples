@@ -73,7 +73,7 @@ path, connect a live account, make a small real purchase and refund it.
 
 ## How the SDK is installed
 
-`package.json` installs `@manalens/web` (`^0.4.0`) from npm, and the server
+`package.json` installs `@manalens/web` (`^0.5.0`) from npm, and the server
 serves its `snippet.global.js`. On your own site, host the file yourself (see
 [with-html](../with-html)).
 

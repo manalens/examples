@@ -16,8 +16,8 @@ export const MANALENS_ENDPOINT: string = import.meta.env.PUBLIC_MANALENS_ENDPOIN
  * not this value. Change the file and the hash together.
  *
  * To load the SDK from the Manalens CDN instead, set the src to
- * https://cdn.manalens.dev/web@0.4.0. The hash is the same; it is also in the
- * release notes of web-v0.4.0.
+ * https://cdn.manalens.dev/web@0.5.0. The hash is the same; it is also in the
+ * release notes of web-v0.5.0.
  */
 export const MANALENS_SNIPPET_SRC = '/snippet.global.js';
-export const MANALENS_SNIPPET_INTEGRITY = 'sha384-6NHDgHrSAx9IB6oBb3iNn2sBrGvTn9Kp5WgXXdXYLbKVqEuK2RxvQqPQRaq1KeUE';
+export const MANALENS_SNIPPET_INTEGRITY = 'sha384-Qip2jzG2B+MR5a/+/sS+KIao4wZg0NemgALmFShR4yFW/A4wchaEZu8jdVcw1ITS';

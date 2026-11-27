@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@manalens/node':
-        specifier: ^0.2.0
-        version: 0.2.0
+        specifier: ^0.2.1
+        version: 0.2.1
       express:
         specifier: ^5.1.0
         version: 5.3.0
@@ -27,8 +27,8 @@ importers:
 
 packages:
 
-  '@manalens/node@0.2.0':
-    resolution: {integrity: sha512-R/99xu/DD0S6H22sAY/djOTW/rKVm3nnNRQwxcgUUfgU8t4n96kCcKC39Exif9cb0BFl6C+qlzpX0LMVDTFomA==}
+  '@manalens/node@0.2.1':
+    resolution: {integrity: sha512-sV0NufRECtlgX38K1WX3O6iF0IcmVFrwGCP1gPg5im4xkl+64uiQRK58x66aevO7/hCjo3vjiS+X7e5q2556bw==}
     engines: {node: '>=20.3'}
 
   '@types/body-parser@1.19.6':
@@ -325,7 +325,7 @@ packages:
 
 snapshots:
 
-  '@manalens/node@0.2.0': {}
+  '@manalens/node@0.2.1': {}
 
   '@types/body-parser@1.19.6':
     dependencies:

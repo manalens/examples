@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@manalens/node": "^0.2.0",
+    "@manalens/node": "^0.2.1",
     "express": "^5.1.0"
   },
   "devDependencies": {

@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@manalens/web':
-        specifier: ^0.4.0
-        version: 0.4.0
+        specifier: ^0.5.0
+        version: 0.5.0
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
@@ -36,8 +36,8 @@ importers:
 
 packages:
 
-  '@manalens/web@0.4.0':
-    resolution: {integrity: sha512-d7yTlgCHtLDJQB7dtY4RabjoaQVzhzqiWTpekl1UCegKLwTNZq8UkLyy4qAH491rPBumbFwyjfb9pjmZog5tlw==}
+  '@manalens/web@0.5.0':
+    resolution: {integrity: sha512-I6ps+Yoeo+z4wHMdtZDqbu1KRbBWCEKkomM1xq4XOaa0XXjruU7Hzlpgo7XLp9NnyIcPIoBeJo2KdFm91e3UlQ==}
 
   '@types/body-parser@1.19.6':
     resolution: {integrity: sha512-HLFeCYgz89uk22N5Qg3dvGvsv46B8GLvKKo1zKG4NybA8U2DiEO3w9lqGg29t/tfLRJpJ6iQxnVw4OnB7MoM9g==}
@@ -354,7 +354,7 @@ packages:
 
 snapshots:
 
-  '@manalens/web@0.4.0': {}
+  '@manalens/web@0.5.0': {}
 
   '@types/body-parser@1.19.6':
     dependencies:

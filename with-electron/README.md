@@ -85,8 +85,8 @@ your project domain. The content security policy in `src/main.mjs` allows
 `package.json` installs both packages from npm:
 
 ```json
-"@manalens/node": "^0.2.0",
-"@manalens/web": "^0.4.0"
+"@manalens/node": "^0.2.1",
+"@manalens/web": "^0.5.0"
 ```
 
 The renderer has no bundler: the main process serves the web SDK build from

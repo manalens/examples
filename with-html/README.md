@@ -62,12 +62,12 @@ domain (or a subdomain). On a real site you do not need `serve.mjs`: copy the
 
 To load the SDK from the Manalens CDN, use the pinned URL and the
 `integrity` value from the
-[release notes](https://github.com/manalens/manalens-js/releases/tag/web-v0.4.0):
+[release notes](https://github.com/manalens/manalens-js/releases/tag/web-v0.5.0):
 
 ```html
 <script
-  src="https://cdn.manalens.dev/web@0.4.0"
-  integrity="sha384-6NHDgHrSAx9IB6oBb3iNn2sBrGvTn9Kp5WgXXdXYLbKVqEuK2RxvQqPQRaq1KeUE"
+  src="https://cdn.manalens.dev/web@0.5.0"
+  integrity="sha384-Qip2jzG2B+MR5a/+/sS+KIao4wZg0NemgALmFShR4yFW/A4wchaEZu8jdVcw1ITS"
   crossorigin="anonymous"
   data-publishable-key="YOUR_PUBLISHABLE_KEY"
   data-endpoint="https://YOUR_COLLECTOR_ENDPOINT"
@@ -79,7 +79,7 @@ Change the version and the hash together.
 
 ## How the SDK is installed
 
-`pnpm install` installs `@manalens/web` (`^0.4.0`) from npm, and `serve.mjs` serves
+`pnpm install` installs `@manalens/web` (`^0.5.0`) from npm, and `serve.mjs` serves
 its `dist/snippet.global.js` as `/snippet.global.js`.
 
 `pnpm check` checks that the `integrity` value in each page matches that

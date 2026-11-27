@@ -83,7 +83,7 @@ is the client IP.
 `package.json` installs the Node SDK from npm:
 
 ```json
-"@manalens/node": "^0.2.0"
+"@manalens/node": "^0.2.1"
 ```
 
 In your own project: `pnpm add @manalens/node`.

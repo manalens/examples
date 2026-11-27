@@ -75,14 +75,14 @@ itch.io (`*.itch.zone` is allowed by default).
 [Packages/manifest.json](./Packages/manifest.json) installs the package
 `dev.manalens.sdk` from its public repository,
 [manalens-unity](https://github.com/manalens/manalens-unity) (MIT), at the
-release tag `v0.3.0`:
+release tag `v0.4.1`:
 
 ```json
-"dev.manalens.sdk": "https://github.com/manalens/manalens-unity.git#v0.3.0"
+"dev.manalens.sdk": "https://github.com/manalens/manalens-unity.git#v0.4.0"
 ```
 
 Unity Package Manager needs Git on the `PATH` for a git URL. In your own
 project, use **Package Manager > + > Add package from git URL** with the same
-URL. Keep the `#v0.3.0` tag, so your build does not change when a new version
+URL. Keep the `#v0.4.0` tag, so your build does not change when a new version
 is released. The manifest also lists the Unity modules that the SDK and this
 example use: UnityWebRequest, IMGUI and JSON serialize.

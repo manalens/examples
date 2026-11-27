@@ -66,7 +66,7 @@ is allowed by default).
 
 ## How the SDK is installed
 
-`addons/manalens` is a copy of the addon from release `v0.4.0` of
+`addons/manalens` is a copy of the addon from release `v0.4.1` of
 [manalens-godot](https://github.com/manalens/manalens-godot) (MIT). The
 plugin is enabled in `project.godot`, which adds the `Manalens`
 autoload. In your own project, copy the same folder.
@@ -76,5 +76,5 @@ change the version here:
 
 ```bash
 rm -rf addons/manalens
-git -C path/to/manalens-godot archive v0.4.0 addons/manalens | tar -x -C .
+git -C path/to/manalens-godot archive v0.4.1 addons/manalens | tar -x -C .
 ```

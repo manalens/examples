@@ -71,7 +71,7 @@ Host `dist/` on your project domain. Configure your host to serve
 `package.json` installs the web SDK from npm:
 
 ```json
-"@manalens/web": "^0.4.0"
+"@manalens/web": "^0.5.0"
 ```
 
 In your own project: `pnpm add @manalens/web`.

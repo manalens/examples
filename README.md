@@ -52,11 +52,11 @@ Every example uses the latest release of its SDK:
 
 | SDK | Version | Used by | How |
 | --- | --- | --- | --- |
-| [`@manalens/web`](https://www.npmjs.com/package/@manalens/web) | 0.4.0 | with-next, with-html, with-astro, with-react, with-threejs, with-electron, with-stripe, with-paddle | npm, `"@manalens/web": "^0.4.0"` |
-| [`@manalens/node`](https://www.npmjs.com/package/@manalens/node) | 0.2.0 | with-express-server, with-electron | npm, `"@manalens/node": "^0.2.0"` |
-| [Godot addon](https://github.com/manalens/manalens-godot) | 0.4.0 | with-godot | A copy of `addons/manalens` from tag `v0.4.0` |
-| [Unity package](https://github.com/manalens/manalens-unity) `dev.manalens.sdk` | 0.3.0 | with-unity | Git URL in `Packages/manifest.json`, `https://github.com/manalens/manalens-unity.git#v0.3.0` |
-| [Unreal plugin](https://github.com/manalens/manalens-unreal) | 0.3.0 | with-unreal | `with-unreal/get-plugin.sh` downloads tag `v0.3.0` into `with-unreal/Plugins/Manalens` |
+| [`@manalens/web`](https://www.npmjs.com/package/@manalens/web) | 0.5.0 | with-next, with-html, with-astro, with-react, with-threejs, with-electron, with-stripe, with-paddle | npm, `"@manalens/web": "^0.5.0"` |
+| [`@manalens/node`](https://www.npmjs.com/package/@manalens/node) | 0.2.1 | with-express-server, with-electron | npm, `"@manalens/node": "^0.2.1"` |
+| [Godot addon](https://github.com/manalens/manalens-godot) | 0.4.1 | with-godot | A copy of `addons/manalens` from tag `v0.4.1` |
+| [Unity package](https://github.com/manalens/manalens-unity) `dev.manalens.sdk` | 0.4.0 | with-unity | Git URL in `Packages/manifest.json`, `https://github.com/manalens/manalens-unity.git#v0.4.0` |
+| [Unreal plugin](https://github.com/manalens/manalens-unreal) | 0.4.0 | with-unreal | `with-unreal/get-plugin.sh` downloads tag `v0.3.0` into `with-unreal/Plugins/Manalens` |
 
 The web and Node SDK source is in
 [manalens-js](https://github.com/manalens/manalens-js). All SDKs are MIT.
@@ -69,7 +69,7 @@ To use an SDK in your own project:
 - Node SDK: `pnpm add @manalens/node`.
 - Godot: copy `addons/manalens` of a release into your project.
 - Unity: in the Package Manager, add the git URL
-  `https://github.com/manalens/manalens-unity.git#v0.3.0`.
+  `https://github.com/manalens/manalens-unity.git#v0.4.0`.
 - Unreal: copy the `Manalens` folder of a release into `Plugins/`.
 
 ## Smoke test

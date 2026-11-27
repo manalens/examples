@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "dev.manalens.sdk": "https://github.com/manalens/manalens-unity.git#v0.3.0",
+    "dev.manalens.sdk": "https://github.com/manalens/manalens-unity.git#v0.4.0",
     "com.unity.modules.imgui": "1.0.0",
     "com.unity.modules.jsonserialize": "1.0.0",
     "com.unity.modules.unitywebrequest": "1.0.0"

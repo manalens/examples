@@ -77,13 +77,13 @@ settings), build, and deploy on your project domain.
 
 To load the SDK from the Manalens CDN instead of `/snippet.global.js`, use
 the pinned URL and the `integrity` value from the
-[release notes](https://github.com/manalens/manalens-js/releases/tag/web-v0.4.0):
+[release notes](https://github.com/manalens/manalens-js/releases/tag/web-v0.5.0):
 
 ```astro
 <script
   is:inline
-  src="https://cdn.manalens.dev/web@0.4.0"
-  integrity="sha384-6NHDgHrSAx9IB6oBb3iNn2sBrGvTn9Kp5WgXXdXYLbKVqEuK2RxvQqPQRaq1KeUE"
+  src="https://cdn.manalens.dev/web@0.5.0"
+  integrity="sha384-Qip2jzG2B+MR5a/+/sS+KIao4wZg0NemgALmFShR4yFW/A4wchaEZu8jdVcw1ITS"
   crossorigin="anonymous"
   data-publishable-key={MANALENS_PUBLISHABLE_KEY}
   data-endpoint={MANALENS_ENDPOINT}
@@ -148,7 +148,7 @@ these generators.
 
 ## How the SDK is installed
 
-`pnpm install` installs `@manalens/web` (`^0.4.0`) from npm.
+`pnpm install` installs `@manalens/web` (`^0.5.0`) from npm.
 `scripts/snippet.mjs` (run by `pnpm dev` and `pnpm build`) copies its
 `dist/snippet.global.js` to `public/snippet.global.js`. It fails when the
 file hash is not `MANALENS_SNIPPET_INTEGRITY` in `src/config.ts`.

@@ -143,21 +143,21 @@ then package the game.
 ## How the plugin is installed
 
 The plugin is not in this repository. [get-plugin.sh](./get-plugin.sh)
-downloads release `v0.3.0` of
+downloads release `v0.4.1` of
 [manalens-unreal](https://github.com/manalens/manalens-unreal) (MIT) and puts
 its `Manalens` folder in `Plugins/Manalens`. `Plugins/` is in `.gitignore`.
 `ManalensExample.uproject` turns the plugin on.
 
 In your own project, use one of these:
 
-- **Download:** get the `v0.3.0` source archive from the
+- **Download:** get the `v0.4.0` source archive from the
   [releases page](https://github.com/manalens/manalens-unreal/releases) and
   copy its `Manalens` folder into `Plugins/`.
 - **Git:** clone the repository and copy or link its `Manalens` folder into
   `Plugins/`:
 
   ```bash
-  git clone --branch v0.3.0 https://github.com/manalens/manalens-unreal.git
+  git clone --branch v0.4.0 https://github.com/manalens/manalens-unreal.git
   cp -R manalens-unreal/Manalens Plugins/Manalens
   ```
 

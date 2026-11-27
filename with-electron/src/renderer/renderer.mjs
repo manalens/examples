@@ -30,10 +30,8 @@ if (anonymousId) {
 
 /** Called by the main process before a normal quit. */
 window.gameQuit = async () => {
-  // The SDK ends the game session on pagehide. Electron quits before the page
-  // hides, so send that event now: it queues session_end. Then send the queue.
-  window.dispatchEvent(new Event('pagehide'));
-  await analytics.flush();
+  // Sends session_end, then the queue, for at most 2 seconds. The SDK then stops.
+  await analytics.shutdown();
 };
 
 let level = 1;

@@ -9,11 +9,11 @@ importers:
   .:
     dependencies:
       '@manalens/node':
-        specifier: ^0.2.0
-        version: 0.2.0
+        specifier: ^0.2.1
+        version: 0.2.1
       '@manalens/web':
-        specifier: ^0.4.0
-        version: 0.4.0
+        specifier: ^0.5.0
+        version: 0.5.0
     devDependencies:
       '@types/node':
         specifier: ^24.0.0
@@ -35,12 +35,12 @@ packages:
     resolution: {integrity: sha512-3kSBtG8ObcTVfXanm5vVJ6UnBLEVmVsRk1M+vGqCuMBV+XLCbJYuWQful+yIy0GQDsSlK0kHEriEHn7SPk4EnA==}
     engines: {node: '>=22.12.0'}
 
-  '@manalens/node@0.2.0':
-    resolution: {integrity: sha512-R/99xu/DD0S6H22sAY/djOTW/rKVm3nnNRQwxcgUUfgU8t4n96kCcKC39Exif9cb0BFl6C+qlzpX0LMVDTFomA==}
+  '@manalens/node@0.2.1':
+    resolution: {integrity: sha512-sV0NufRECtlgX38K1WX3O6iF0IcmVFrwGCP1gPg5im4xkl+64uiQRK58x66aevO7/hCjo3vjiS+X7e5q2556bw==}
     engines: {node: '>=20.3'}
 
-  '@manalens/web@0.4.0':
-    resolution: {integrity: sha512-d7yTlgCHtLDJQB7dtY4RabjoaQVzhzqiWTpekl1UCegKLwTNZq8UkLyy4qAH491rPBumbFwyjfb9pjmZog5tlw==}
+  '@manalens/web@0.5.0':
+    resolution: {integrity: sha512-I6ps+Yoeo+z4wHMdtZDqbu1KRbBWCEKkomM1xq4XOaa0XXjruU7Hzlpgo7XLp9NnyIcPIoBeJo2KdFm91e3UlQ==}
 
   '@types/node@24.19.2':
     resolution: {integrity: sha512-93d49wCWJkCyN87MxLpNN6KXPCwFw7bVUg79mGUV1OS40JGWwVCr8n61DXCSqz7CV6/VfPkb7xec7uP2M+QHWQ==}
@@ -111,9 +111,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@manalens/node@0.2.0': {}
+  '@manalens/node@0.2.1': {}
 
-  '@manalens/web@0.4.0': {}
+  '@manalens/web@0.5.0': {}
 
   '@types/node@24.19.2':
     dependencies:
