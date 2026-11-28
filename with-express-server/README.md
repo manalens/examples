@@ -12,7 +12,9 @@ An Express server that sends server events with the Manalens
   `purchase` with a numeric `revenue` property. It does **not** send the IP or
   the user agent, because they are the provider's, not the player's. The
   message ID comes from the provider's event ID, so a repeated webhook counts
-  once.
+  once. The request must send the `x-webhook-secret` header with the value of
+  `WEBHOOK_SECRET`. A missing or wrong header gets `401`. When
+  `WEBHOOK_SECRET` is empty, every webhook request gets `401`.
 
 ## Key: Secret key
 
@@ -34,7 +36,7 @@ Create the key in **Settings > General > Credentials > Create secret key**
 | --- | --- | --- |
 | `MANALENS_SECRET_KEY` | Yes | The Secret key, `mana_sk_...` |
 | `MANALENS_ENDPOINT` | Yes | The collector URL without `/v0/events` |
-| `WEBHOOK_SECRET` | No | A shared secret for `x-webhook-secret`. Empty accepts every request: use that only locally |
+| `WEBHOOK_SECRET` | Yes | The shared secret for `x-webhook-secret`. Empty rejects every webhook request. `.env.example` has a local test value |
 | `PORT` | No | Default `3000` |
 | `MANALENS_DEBUG` | No | `true` logs dropped events and failed requests |
 
@@ -64,8 +66,12 @@ Create the key in **Settings > General > Credentials > Create secret key**
 
    curl -i -X POST http://localhost:3000/webhooks/purchase \
      -H 'content-type: application/json' \
+     -H 'x-webhook-secret: local-test-secret-change-me' \
      -d '{"event_id":"evt_1","user_id":"player_123","amount_cents":499,"currency":"USD","sku":"dlc_harbor","store":"web"}'
    ```
+
+   The webhook request sends the `WEBHOOK_SECRET` value of `.env.example`.
+   If you change it in `.env`, change it in the command too.
 
 5. Stop the server with Ctrl+C. It sends the queued events first
    (`analytics.shutdown()`). The events appear in **Activity** after a short
@@ -77,6 +83,15 @@ Set `MANALENS_ENDPOINT` to your collector URL and `MANALENS_SECRET_KEY` to the p
 Secret key, in your host's secret store. Behind a load balancer, set
 `trust proxy` in `src/app.mjs` to the number of proxy hops, so that `req.ip`
 is the client IP.
+
+Set `WEBHOOK_SECRET` to a long random secret, also in the secret store. For
+example: `openssl rand -hex 32`. Never use the value from `.env.example`.
+
+The shared `x-webhook-secret` header only shows the idea. A real payment
+provider webhook must check the provider's HMAC signature of the raw request
+body instead (for example, the `Stripe-Signature` header of Stripe or the
+`Paddle-Signature` header of Paddle), with the provider SDK or its documented
+steps.
 
 ## How the SDK is installed
 
@@ -94,3 +109,5 @@ In your own project: `pnpm add @manalens/node`.
   the smoke test can pass its own.
 - `src/server.mjs`: creates the client from the environment, starts the
   server, and calls `shutdown()` on exit.
+- `test/webhook.test.mjs`: tests of the webhook secret check, with a fake
+  analytics client. Run them with `pnpm test`.

@@ -1,7 +1,7 @@
 // Run one step in every npm example.
 //
 //   node scripts/each.mjs install   pnpm install --frozen-lockfile
-//   node scripts/each.mjs check     the build, type check or SRI check of each
+//   node scripts/each.mjs check     the build, type check, tests or SRI check of each
 import { execFileSync } from 'node:child_process';
 
 export const examples = [
@@ -11,7 +11,7 @@ export const examples = [
   { dir: 'with-threejs', check: ['build'] },
   { dir: 'with-react', check: ['build'] },
   { dir: 'with-electron', check: ['typecheck'] },
-  { dir: 'with-express-server', check: ['typecheck'] },
+  { dir: 'with-express-server', check: ['check'] },
   { dir: 'with-stripe', check: ['typecheck'] },
   { dir: 'with-paddle', check: ['typecheck'] },
 ];
