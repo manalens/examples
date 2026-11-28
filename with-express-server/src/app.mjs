@@ -8,7 +8,8 @@ import express from 'express';
  *
  * @param {object} deps
  * @param {import('@manalens/node').Manalens} deps.analytics
- * @param {string} [deps.webhookSecret] the shared secret of the purchase webhook
+ * @param {string} [deps.webhookSecret] the shared secret of the purchase
+ *   webhook. Empty or unset rejects every webhook request.
  */
 export function createApp({ analytics, webhookSecret = '' }) {
   const app = express();
@@ -47,8 +48,13 @@ export function createApp({ analytics, webhookSecret = '' }) {
   // A webhook from a payment provider. The request comes from the provider,
   // not from the player, so do NOT send req.ip or the user agent here: they
   // would give the provider's country and device to the player.
+  //
+  // Fail closed: with no WEBHOOK_SECRET, every request gets 401. Otherwise
+  // anyone could send fake purchases with the project Secret key. A real
+  // provider webhook (Stripe, Paddle) must check the provider's HMAC
+  // signature of the raw body instead of a shared header.
   app.post('/webhooks/purchase', (req, res) => {
-    if (webhookSecret && !sameSecret(req.get('x-webhook-secret') ?? '', webhookSecret)) {
+    if (!webhookSecret || !sameSecret(req.get('x-webhook-secret') ?? '', webhookSecret)) {
       res.sendStatus(401);
       return;
     }

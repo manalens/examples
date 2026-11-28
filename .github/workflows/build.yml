@@ -1,6 +1,6 @@
 name: Build examples
 
-# Builds, type-checks and checks each example. No secrets, and no request to
+# Builds, type-checks, tests and checks each example. No secrets, and no request to
 # a collector: the examples build without keys, and the smoke test
 # (scripts/smoke.mjs) is not run here.
 
@@ -31,7 +31,7 @@ jobs:
           - { name: with-threejs, run: build }
           - { name: with-react, run: build }
           - { name: with-electron, run: typecheck }
-          - { name: with-express-server, run: typecheck }
+          - { name: with-express-server, run: check }
           - { name: with-stripe, run: typecheck }
           - { name: with-paddle, run: typecheck }
     name: ${{ matrix.name }}
